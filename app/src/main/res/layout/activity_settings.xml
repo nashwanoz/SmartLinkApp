@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://android.com"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#F4F6F9"
+    android:layoutDirection="rtl"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="إعدادات التطبيق"
+        android:textColor="#0D47A1"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="24dp"/>
+
+    <!-- خيار تشغيل التنبيهات -->
+    <CheckBox
+        android:id="@+id/cbNotifications"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="تفعيل التنبيهات عند إرسال رسالة"
+        android:textSize="16sp"
+        android:textColor="#37474F"
+        android:layout_marginBottom="16dp"
+        android:paddingRight="8dp"/>
+
+    <!-- خيار التشغيل التلقائي -->
+    <CheckBox
+        android:id="@+id/cbAutoStart"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="تشغيل الخادم تلقائياً عند فتح التطبيق"
+        android:textSize="16sp"
+        android:textColor="#37474F"
+        android:layout_marginBottom="24dp"
+        android:paddingRight="8dp"/>
+
+    <Button
+        android:id="@+id/btnSaveSettings"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:text="حفظ الإعدادات"
+        android:textColor="#FFFFFF"
+        android:backgroundTint="#0D47A1"
+        android:textStyle="bold"/>
+</LinearLayout>
