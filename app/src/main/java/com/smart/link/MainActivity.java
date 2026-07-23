@@ -2,6 +2,7 @@ package com.smart.link;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.wifi.WifiManager;
@@ -36,6 +37,9 @@ public class MainActivity extends AppCompatActivity {
     private EditText etServerPort;
     private Button btnToggleServer;
     
+    // الأزرار الجديدة المضافة لربط الواجهة الاحترافية
+    private Button btnSettings, btnDeveloper;
+    
     private MySmsServer smsServer;
     private boolean isServerRunning = false;
     
@@ -48,7 +52,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // ربط المعرفات البرمجية بالواجهةactivity_main.xml
+        // ربط المعرفات البرمجية بالواجهة activity_main.xml الأصيلة
         tvServerIp = findViewById(R.id.tvServerIp);
         tvLogs = findViewById(R.id.tvLogs);
         tvSuccessCount = findViewById(R.id.tvSuccessCount);
@@ -56,125 +60,31 @@ public class MainActivity extends AppCompatActivity {
         etServerPort = findViewById(R.id.etServerPort);
         btnToggleServer = findViewById(R.id.btnToggleServer);
 
-        // تهيئة ملف التخزين الداخلي واسترجاع العدادات القديمة
-        sharedPreferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        successCounter = sharedPreferences.getInt(KEY_SUCCESS, 0);
-        failedCounter = sharedPreferences.getInt(KEY_FAILED, 0);
+        // ربط أزرار التنقل الجديدة بالواجهة الحديثة
+        btnSettings = findViewById(R.id.btnSettings);
+        btnDeveloper = findViewById(R.id.btnDeveloper);
 
-        // تحديث أرقام العدادات على الشاشة فور فتح التطبيق
-        if (tvSuccessCount != null) tvSuccessCount.setText(String.valueOf(successCounter));
-        if (tvFailedCount != null) tvFailedCount.setText(String.valueOf(failedCounter));
-
-        checkSmsPermission();
-        updateIpDisplay();
-
-        if (btnToggleServer != null) {
-            btnToggleServer.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    if (isServerRunning) {
-                        stopServer();
-                    } else {
-                        startServer();
-                    }
-                }
-            });
-        }
-    }
-
-    private void updateIpDisplay() {
-        if (tvServerIp != null) {
-            String ipAddress = getWifiIpAddress();
-            tvServerIp.setText("http://" + ipAddress);
-        }
-    }
-
-    private void startServer() {
-        if (etServerPort == null || btnToggleServer == null) return;
-        
-        String portStr = etServerPort.getText().toString().trim();
-        if (portStr.isEmpty()) {
-            Toast.makeText(this, "الرجاء إدخال رقم المنفذ (Port)", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        
-        int port = Integer.parseInt(portStr);
-        try {
-            smsServer = new MySmsServer(port);
-            smsServer.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false);
-            isServerRunning = true;
-            
-            etServerPort.setEnabled(false);
-            btnToggleServer.setText("إيقاف السيرفر");
-            btnToggleServer.setBackgroundColor(ContextCompat.getColor(this, android.R.color.holo_red_dark));
-            logMessage("✅ نظام الربط الذكي SMART_LINK جاهز للإرسال...");
-        } catch (IOException e) {
-            logMessage("❌ فشل تشغيل السيرفر: " + e.getMessage());
-        }
-    }
-
-    private void stopServer() {
-        if (smsServer != null) {
-            smsServer.stop();
-            isServerRunning = false;
-            
-            if (etServerPort != null) etServerPort.setEnabled(true);
-            if (btnToggleServer != null) {
-                btnToggleServer.setText("تشغيل السيرفر");
-                btnToggleServer.setBackgroundColor(ContextCompat.getColor(this, android.R.color.holo_green_dark));
-            }
-            logMessage("🛑 تم إيقاف السيرفر يدوياً.");
-        }
-    }
-
-    private String getWifiIpAddress() {
-        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
-        if (wifiManager == null) return "0.0.0.0";
-        int ipAddress = wifiManager.getConnectionInfo().getIpAddress();
-        if (ByteOrder.nativeOrder().equals(ByteOrder.LITTLE_ENDIAN)) {
-            ipAddress = Integer.reverseBytes(ipAddress);
-        }
-        byte[] ipByteArray = BigInteger.valueOf(ipAddress).toByteArray();
-        String ipAddressString;
-        try {
-            ipAddressString = InetAddress.getByAddress(ipByteArray).getHostAddress();
-        } catch (UnknownHostException ex) {
-            ipAddressString = "0.0.0.0";
-        }
-        return ipAddressString;
-    }
-
-    private void logMessage(final String message) {
-        if (tvLogs == null) return;
-        runOnUiThread(new Runnable() {
+        // تشغيل صفحة الإعدادات عند الضغط عليها
+        btnSettings.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void run() {
-                tvLogs.append(message + "\n");
+            public void onClick(View v) {
+                Intent intent = new Intent(MainActivity.this, SettingsActivity.class);
+                startActivity(intent);
             }
         });
-    }
 
-    public void sendSmsMessage(String phoneNumber, String messageText) {
-        try {
-            SmsManager smsManager = SmsManager.getDefault();
-            smsManager.sendTextMessage(phoneNumber, null, messageText, null, null);
-            
-            successCounter++;
-            // حفظ القيمة الجديدة في التخزين الداخلي بشكل دائم
-            sharedPreferences.edit().putInt(KEY_SUCCESS, successCounter).apply();
-            
-            if (tvSuccessCount != null) tvSuccessCount.setText(String.valueOf(successCounter));
-            logMessage("🚀 [تم الإرسال بنجاح] للرقم: " + phoneNumber);
-        } catch (Exception e) {
-            failedCounter++;
-            // حفظ القيمة الجديدة في التخزين الداخلي بشكل دائم
-            sharedPreferences.edit().putInt(KEY_FAILED, failedCounter).apply();
-            
-            if (tvFailedCount != null) tvFailedCount.setText(String.valueOf(failedCounter));
-            logMessage("❌ [فشل الإرسال] للرقم: " + phoneNumber + " السبب: " + e.getMessage());
-        }
+        // تشغيل صفحة المطور عند الضغط عليها
+        btnDeveloper.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(MainActivity.this, DeveloperActivity.class);
+                startActivity(intent);
+            }
+        });
+        
+        // استدعاء دالة فحص الصلاحيات عند بدء التشغيل
+        checkSmsPermission();
     }
-
     private void checkSmsPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.SEND_SMS}, SMS_PERMISSION_CODE);
