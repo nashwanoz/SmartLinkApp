@@ -3,171 +3,242 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F4F6F9"
-    android:padding="16dp"
+    android:background="#F4F6F9">
     android:layoutDirection="rtl">
 
-    <!-- العنوان الرئيسي للتطبيق -->
-    <TextView
-        android:id="@+id/tvMainTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="16dp"
-        android:text="نظام الربط الذكي SMART_LINK"
-        android:textColor="#2C3E50"
-        android:textSize="20sp"
-        android:textStyle="bold" />
-
-    <!-- بطاقة عداد الرسائل الناجحة -->
-    <androidx.cardview.widget.CardView
-        android:id="@+id/cardSuccess"
-        android:layout_width="match_parent"
-        android:layout_height="90dp"
-        android:layout_below="@id/tvMainTitle"
-        android:layout_marginTop="20dp"
-        app:cardCornerRadius="10dp"
-        app:cardElevation="3dp">
-        
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="#E8F5E9"
-            android:gravity="center"
-            android:orientation="vertical">
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="الرسائل المرسلة بنجاح"
-                android:textColor="#2E7D32"
-                android:textSize="14sp" />
-            <TextView
-                android:id="@+id/tvSuccessCount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="0"
-                android:textColor="#1B5E20"
-                android:textSize="28sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-    </androidx.cardview.widget.CardView>
-
-    <!-- بطاقة عداد الرسائل الفاشلة -->
-    <androidx.cardview.widget.CardView
-        android:id="@+id/cardFailed"
-        android:layout_width="match_parent"
-        android:layout_height="90dp"
-        android:layout_below="@id/cardSuccess"
-        android:layout_marginTop="12dp"
-        app:cardCornerRadius="10dp"
-        app:cardElevation="3dp">
-        
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="#FFEBEE"
-            android:gravity="center"
-            android:orientation="vertical">
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="الرسائل الفاشلة"
-                android:textColor="#C62828"
-                android:textSize="14sp" />
-            <TextView
-                android:id="@+id/tvFailedCount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="0"
-                android:textColor="#B71C1C"
-                android:textSize="28sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-    </androidx.cardview.widget.CardView>
-
-    <!-- تفاصيل الخادم والـ IP الإرشادية -->
+    <!-- أولاً: رأس الشاشة (Header) المموج أو المتدرج -->
     <LinearLayout
-        android:id="@+id/layoutServerConfig"
+        android:id="@+id/layoutHeader"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/cardFailed"
-        android:layout_marginTop="20dp"
-        android:orientation="vertical">
+        android:layout_height="180dp"
+        android:background="@drawable/header_gradient_bg" 
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="16dp">
+
+        <ImageView
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:src="@drawable/ic_launcher_foreground" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="تطبيق الرسائل الذكي"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginTop="8dp"/>
 
         <TextView
             android:id="@+id/tvServerIp"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="#ECEFF1"
-            android:padding="8dp"
-            android:text="http://0.0.0"
-            android:textColor="#2980B9"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            android:gravity="center" />
+            android:text="IP: 0.0.0.0"
+            android:textColor="#E0E0E0"
+            android:textSize="14sp"
+            android:layout_marginTop="4dp"/>
+    </LinearLayout>
+
+    <!-- ثانياً: قسم الإحصائيات السريعة (تظهر كبطاقات عائمة) -->
+    <LinearLayout
+        android:id="@+id/layoutStats"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/layoutHeader"
+        android:layout_marginTop="-25dp"
+        android:layout_marginLeft="16dp"
+        android:layout_marginRight="16dp"
+        android:orientation="horizontal"
+        android:weightSum="2">
+
+        <!-- بطاقة النجاح -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="4dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="12dp"
+                android:gravity="center">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="الناجحة"
+                    android:textColor="#757575"
+                    android:textSize="12sp"/>
+                <TextView
+                    android:id="@+id/tvSuccessCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0"
+                    android:textColor="#2E7D32"
+                    android:textSize="22sp"
+                    android:textStyle="bold"/>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- بطاقة الفشل -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="4dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="12dp"
+                android:gravity="center">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="الفاشلة"
+                    android:textColor="#757575"
+                    android:textSize="12sp"/>
+                <TextView
+                    android:id="@+id/tvFailedCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0"
+                    android:textColor="#C62828"
+                    android:textSize="22sp"
+                    android:textStyle="bold"/>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+    </LinearLayout>
+
+    <!-- ثالثاً: سجل العمليات والرسائل (الأكبر مساحة في المنتصف) -->
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/layoutStats"
+        android:layout_above="@id/layoutControls"
+        android:layout_margin="16dp"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="2dp">
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:padding="16dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="المنفذ (Port): "
-                android:textColor="#34495E"
-                android:textSize="14sp" />
+                android:text="سجل العمليات المباشر (Logs)"
+                android:textColor="#37474F"
+                android:textStyle="bold"
+                android:textSize="14sp"
+                android:layout_marginBottom="8dp"/>
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#FAFAFA"
+                android:padding="8dp">
+                <TextView
+                    android:id="@+id/tvLogs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="بانتظار بدء تشغيل الخادم..."
+                    android:textColor="#555555"
+                    android:textSize="13sp"
+                    android:lineSpacingExtra="4dp"/>
+            </ScrollView>
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <!-- رابعاً: شريط التحكم السفلي (منفذ البورت وزر التشغيل الأنيق) -->
+    <LinearLayout
+        android:id="@+id/layoutControls"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:background="#FFFFFF"
+        android:padding="16dp"
+        android:orientation="vertical"
+        android:elevation="8dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="12dp">
 
             <EditText
                 android:id="@+id/etServerPort"
-                android:layout_width="80dp"
-                android:layout_height="wrap_content"
-                android:inputType="number"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:hint="8080"
                 android:text="8080"
-                android:textColor="#2C3E50"
-                android:gravity="center" />
+                android:inputType="number"
+                android:background="@drawable/edittext_rounded_bg"
+                android:paddingLeft="12dp"
+                android:paddingRight="12dp"
+                android:gravity="center"
+                android:textStyle="bold"/>
 
-            <Button
-                android:id="@+id/btnToggleServer"
-                android:layout_width="match_parent"
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginRight="10dp"
-                android:backgroundTint="#2E7D32"
-                android:text="تشغيل السيرفر"
-                android:textColor="#FFFFFF" />
+                android:text="منفذ الخادم (Port):"
+                android:textColor="#37474F"
+                android:layout_marginLeft="12dp"
+                android:textStyle="bold"/>
         </LinearLayout>
-    </LinearLayout>
 
-    <!-- صندوق عرض سجل العمليات الحية (Logs) -->
-    <TextView
-        android:id="@+id/tvLogsTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/layoutServerConfig"
-        android:layout_marginTop="15dp"
-        android:text="📋 سجل العمليات الحية (Logs):"
-        android:textColor="#34495E"
-        android:textSize="13sp"
-        android:textStyle="bold" />
+        <Button
+            android:id="@+id/btnToggleServer"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:text="تشغيل الخادم"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:backgroundTint="#1E88E5"
+            app:backgroundTint="#1E88E5"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"/>
 
-    <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_below="@id/tvLogsTitle"
-        android:layout_marginTop="5dp"
-        android:background="#2C3E50"
-        android:padding="8dp">
-
-        <TextView
-            android:id="@+id/tvLogs"
+        <!-- أزرار الإعدادات والمطور الإضافية (بشكل مسطح واحترافي أسفل الشاشة) -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text=""
-            android:textColor="#2ECC71"
-            android:textSize="12sp"
-            android:fontFamily="monospace" />
-    </ScrollView>
+            android:orientation="horizontal"
+            android:weightSum="2"
+            android:layout_marginTop="12dp">
+
+            <Button
+                android:id="@+id/btnDeveloper"
+                style="?android:attr/borderlessButtonStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="ℹ️ حول المطور"
+                android:textColor="#78909C"
+                android:textSize="13sp"/>
+
+            <Button
+                android:id="@+id/btnSettings"
+                style="?android:attr/borderlessButtonStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="⚙️ إعدادات التطبيق"
+                android:textColor="#78909C"
+                android:textSize="13sp"/>
+        </LinearLayout>
+    </LinearLayout>
 
 </RelativeLayout>
