@@ -4,243 +4,170 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#F4F6F9"
+    android:padding="16dp"
     android:layoutDirection="rtl">
 
-    <!-- العنوان العلوي للبرنامج -->
+    <!-- العنوان الرئيسي للتطبيق -->
     <TextView
-        android:id="@+id/tvAppTitle"
+        android:id="@+id/tvMainTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="16dp"
+        android:text="نظام الربط الذكي SMART_LINK"
+        android:textColor="#2C3E50"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <!-- بطاقة عداد الرسائل الناجحة -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/cardSuccess"
+        android:layout_width="match_parent"
+        android:layout_height="90dp"
+        android:layout_below="@id/tvMainTitle"
+        android:layout_marginTop="20dp"
+        app:cardCornerRadius="10dp"
+        app:cardElevation="3dp">
+        
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#E8F5E9"
+            android:gravity="center"
+            android:orientation="vertical">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="الرسائل المرسلة بنجاح"
+                android:textColor="#2E7D32"
+                android:textSize="14sp" />
+            <TextView
+                android:id="@+id/tvSuccessCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#1B5E20"
+                android:textSize="28sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <!-- بطاقة عداد الرسائل الفاشلة -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/cardFailed"
+        android:layout_width="match_parent"
+        android:layout_height="90dp"
+        android:layout_below="@id/cardSuccess"
+        android:layout_marginTop="12dp"
+        app:cardCornerRadius="10dp"
+        app:cardElevation="3dp">
+        
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#FFEBEE"
+            android:gravity="center"
+            android:orientation="vertical">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="الرسائل الفاشلة"
+                android:textColor="#C62828"
+                android:textSize="14sp" />
+            <TextView
+                android:id="@+id/tvFailedCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#B71C1C"
+                android:textSize="28sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <!-- تفاصيل الخادم والـ IP الإرشادية -->
+    <LinearLayout
+        android:id="@+id/layoutServerConfig"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="برنامج الربط الذكي"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        android:textColor="#1A237E"
-        android:gravity="center"
-        android:layout_marginTop="16dp"
-        android:layout_marginBottom="12dp" />
+        android:layout_below="@id/cardFailed"
+        android:layout_marginTop="20dp"
+        android:orientation="vertical">
 
-    <!-- المحتوى الرئيسي القابل للتمرير باستثناء تذييل الشاشة -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_below="@id/tvAppTitle"
-        android:layout_above="@+id/llFooter"
-        android:orientation="vertical"
-        android:paddingHorizontal="16dp">
-
-        <!-- بطاقة إعدادات الاتصال والسيرفر -->
-        <androidx.cardview.widget.CardView
+        <TextView
+            android:id="@+id/tvServerIp"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            app:cardElevation="3dp"
-            app:cardCornerRadius="10dp"
-            app:cardBackgroundColor="#FFFFFF">
+            android:background="#ECEFF1"
+            android:padding="8dp"
+            android:text="http://0.0.0"
+            android:textColor="#2980B9"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:gravity="center" />
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="عنوان الـ IP الخاص بالهاتف:"
-                    android:textSize="14sp"
-                    android:textColor="#757575" />
-
-                <TextView
-                    android:id="@+id/tvServerIp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="جاري جلب الـ IP..."
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:textColor="#00796B"
-                    android:layout_marginTop="4dp" />
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="#E0E0E0"
-                    android:layout_marginVertical="12dp" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="منفذ السيرفر (Port): "
-                        android:textSize="14sp"
-                        android:textColor="#333333" />
-
-                    <EditText
-                        android:id="@+id/etServerPort"
-                        android:layout_width="100dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginRight="8dp"
-                        android:inputType="number"
-                        android:text="8080"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:gravity="center" />
-                </LinearLayout>
-
-                <Button
-                    android:id="@+id/btnToggleServer"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="تشغيل السيرفر"
-                    android:backgroundTint="#00796B"
-                    android:textColor="#FFFFFF"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
-
-        <!-- لوحة العدادات والإحصائيات (ناجح / فشل) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="12dp">
-
-            <!-- بطاقة الرسائل الناجحة -->
-            <androidx.cardview.widget.CardView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginLeft="6dp"
-                app:cardElevation="2dp"
-                app:cardCornerRadius="8dp"
-                app:cardBackgroundColor="#E8F5E9">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="12dp"
-                    android:gravity="center">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="الرسائل الناجحة"
-                        android:textColor="#2E7D32"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvSuccessCount"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textColor="#1B5E20"
-                        android:textSize="22sp"
-                        android:textStyle="bold"
-                        android:layout_marginTop="4dp" />
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-
-            <!-- بطاقة الرسائل الفاشلة -->
-            <androidx.cardview.widget.CardView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginRight="6dp"
-                app:cardElevation="2dp"
-                app:cardCornerRadius="8dp"
-                app:cardBackgroundColor="#FFEBEE">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="12dp"
-                    android:gravity="center">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="الرسائل الفاشلة"
-                        android:textColor="#C62828"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvFailedCount"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textColor="#B71C1C"
-                        android:textSize="22sp"
-                        android:textStyle="bold"
-                        android:layout_marginTop="4dp" />
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-        </LinearLayout>
-
-        <!-- عنوان سجل العمليات -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="سجل المراقبة والعمليات المباشرة (Logs):"
-            android:textSize="13sp"
-            android:textColor="#555555"
-            android:layout_marginBottom="4dp" />
-
-        <!-- شاشة المراقبة البرمجية السوداء -->
-        <ScrollView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:background="#1C1D21"
-            android:padding="10dp"
-            android:scrollbars="vertical">
+            android:layout_marginTop="10dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
             <TextView
-                android:id="@+id/tvLogs"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="المنفذ (Port): "
+                android:textColor="#34495E"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/etServerPort"
+                android:layout_width="80dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:text="8080"
+                android:textColor="#2C3E50"
+                android:gravity="center" />
+
+            <Button
+                android:id="@+id/btnToggleServer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="--- نظام مراقبة الربط الذكي جاهز ومستعد ---\n"
-                android:textColor="#00E676"
-                android:fontFamily="monospace"
-                android:textSize="12sp"
-                android:lineSpacingExtra="4dp" />
-        </ScrollView>
+                android:layout_marginRight="10dp"
+                android:backgroundTint="#2E7D32"
+                android:text="تشغيل السيرفر"
+                android:textColor="#FFFFFF" />
+        </LinearLayout>
     </LinearLayout>
 
-    <!-- شريط تذييل الشاشة المثبت في الأسفل لخدمة العملاء -->
-    <LinearLayout
-        android:id="@+id/llFooter"
-        android:layout_width="match_parent"
+    <!-- صندوق عرض سجل العمليات الحية (Logs) -->
+    <TextView
+        android:id="@+id/tvLogsTitle"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
-        android:background="#E1E2E1"
-        android:padding="10dp"
-        android:gravity="center">
+        android:layout_below="@id/layoutServerConfig"
+        android:layout_marginTop="15dp"
+        android:text="📋 سجل العمليات الحية (Logs):"
+        android:textColor="#34495E"
+        android:textSize="13sp"
+        android:textStyle="bold" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/tvLogsTitle"
+        android:layout_marginTop="5dp"
+        android:background="#2C3E50"
+        android:padding="8dp">
 
         <TextView
-            android:layout_width="wrap_content"
+            android:id="@+id/tvLogs"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="خدمة العملاء: "
-            android:textColor="#424242"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="776323844"
-            android:textColor="#0D47A1"
-            android:textSize="15sp"
-            android:textStyle="bold" />
-    </LinearLayout>
+            android:text=""
+            android:textColor="#2ECC71"
+            android:textSize="12sp"
+            android:fontFamily="monospace" />
+    </ScrollView>
 
 </RelativeLayout>
