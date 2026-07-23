@@ -87,7 +87,7 @@ public class MainActivity extends AppCompatActivity {
             etServerPort.setEnabled(false);
             btnToggleServer.setText("إيقاف السيرفر");
             btnToggleServer.setBackgroundColor(ContextCompat.getColor(this, android.R.color.holo_red_dark));
-            logMessage("✅ تم تشغيل السيرفر على المنفذ [" + port + "] وهو مستعد للاستقبال...");
+            logMessage("✅ نظام الربط الذكي SMART_LINK جاهز للإرسال...");
         } catch (IOException e) {
             logMessage("❌ فشل تشغيل السيرفر: " + e.getMessage());
         }
@@ -171,7 +171,7 @@ public class MainActivity extends AppCompatActivity {
                     final String message = rawMessage != null ? URLDecoder.decode(rawMessage, "UTF-8") : null;
 
                     if (phone != null && message != null) {
-                        logMessage("📥 طلب وارد من Node.js لإرسال رسالة إلى: " + phone);
+                        logMessage("📥 تم العثور على رساله الى : " + phone);
                         
                         runOnUiThread(new Runnable() {
                             @Override
