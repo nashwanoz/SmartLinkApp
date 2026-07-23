@@ -18,6 +18,7 @@
         android:theme="@style/Theme.AppCompat.Light.NoActionBar"
         android:usesCleartextTraffic="true">
         
+        <!-- الشاشة الرئيسية للتطبيق -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -26,6 +27,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- تسجيل شاشة إعدادات التطبيق الجديدة -->
+        <activity 
+            android:name=".SettingsActivity"
+            android:exported="false" />
+
+        <!-- تسجيل شاشة حول المطور الجديدة -->
+        <activity 
+            android:name=".DeveloperActivity"
+            android:exported="false" />
+
     </application>
 
 </manifest>
