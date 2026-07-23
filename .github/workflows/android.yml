@@ -1,0 +1,38 @@
+name: Android CI (Smart Link Build)
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    # إجبار السيرفر على استخدام إصدار Gradle 8.4 المستقر والمتوافق
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: '8.4'
+        cache-disabled: true
+
+    # تنظيف المشروع وبنائه بشكل نظيف لتفادي أخطاء الـ Cache
+    - name: Clean and Build with Gradle
+      run: gradle clean assembleDebug
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: SmartLink-SMS-Gateway
+        path: app/build/outputs/apk/debug/app-debug.apk
