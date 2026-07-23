@@ -1,211 +1,251 @@
 package com.smart.link;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.telephony.SmsManager;
 import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import java.io.BufferedReader;
 import java.io.IOException;
-import java.math.BigInteger;
-import java.net.InetAddress;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.net.URLDecoder;
-import java.net.UnknownHostException;
-import java.nio.ByteOrder;
-import java.util.List;
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
-import fi.iki.elonen.NanoHTTPD;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final int SMS_PERMISSION_CODE = 101;
-    
-    private TextView tvServerIp, tvLogs, tvSuccessCount, tvFailedCount;
-    private EditText etServerPort;
+    private TextView tvServerStatus, tvIpAddress, tvPortNumber, tvSentCount;
     private Button btnToggleServer;
-    
-    private MySmsServer smsServer;
     private boolean isServerRunning = false;
-    
-    // عدادات الرسائل
-    private int successCounter = 0;
-    private int failedCounter = 0;
+
+    private ServerSocket serverSocket;
+    private Thread serverThread;
+    private final int SERVER_PORT = 8080; 
+    private int messageCount = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        tvServerIp = findViewById(R.id.tvServerIp);
-        tvLogs = findViewById(R.id.tvLogs);
-        tvSuccessCount = findViewById(R.id.tvSuccessCount);
-        tvFailedCount = findViewById(R.id.tvFailedCount);
-        etServerPort = findViewById(R.id.etServerPort);
+        // ربط العناصر البرمجية بالواجهة
+        tvServerStatus = findViewById(R.id.tvServerStatus);
+        tvIpAddress = findViewById(R.id.tvIpAddress);
+        tvPortNumber = findViewById(R.id.tvPortNumber);
+        tvSentCount = findViewById(R.id.tvSentCount);
         btnToggleServer = findViewById(R.id.btnToggleServer);
 
-        // طلب صلاحية إرسال الرسائل فور فتح التطبيق
-        checkSmsPermission();
+        // فحص وطلب صلاحية إرسال الرسائل فور فتح التطبيق
+        checkPermissions();
 
-        // عرض الـ IP الخاص بالهاتف
-        updateIpDisplay();
+        // إدخال نصوص الواجهة وتجنب قيم الـ Null
+        if (tvIpAddress != null) {
+            tvIpAddress.setText("عنوان IP: " + getDeviceIpAddress());
+        }
+        if (tvPortNumber != null) {
+            tvPortNumber.setText("رقم البورت: " + SERVER_PORT);
+        }
+        
+        updateMessageCount();
 
-        btnToggleServer.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (isServerRunning) {
-                    stopServer();
-                } else {
-                    startServer();
+        if (btnToggleServer != null) {
+            btnToggleServer.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (isTrialExpired()) {
+                        Toast.makeText(MainActivity.this, "عذراً، انتهت صلاحية الفترة التجريبية للبرنامج!", Toast.LENGTH_LONG).show();
+                        return;
+                    }
+
+                    if (!isServerRunning) {
+                        startServer();
+                    } else {
+                        stopServer();
+                    }
                 }
-            }
-        });
-    }
-
-    private void updateIpDisplay() {
-        String ipAddress = getWifiIpAddress();
-        tvServerIp.setText("http://" + ipAddress);
+            });
+        }
     }
 
     private void startServer() {
-        String portStr = etServerPort.getText().toString().trim();
-        if (portStr.isEmpty()) {
-            Toast.makeText(this, "الرجاء إدخال رقم المنفذ (Port)", Toast.LENGTH_SHORT).show();
-            return;
+        isServerRunning = true;
+        if (tvServerStatus != null) {
+            tvServerStatus.setText("حالة السيرفر: يعمل الآن 🟢");
+            tvServerStatus.setTextColor(0xFF4CAF50);
         }
-        
-        int port = Integer.parseInt(portStr);
-        try {
-            smsServer = new MySmsServer(port);
-            smsServer.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false);
-            isServerRunning = true;
-            
-            // قفل حقل النص أثناء تشغيل السيرفر لمنع تضارب المنافذ
-            etServerPort.setEnabled(false);
+        if (btnToggleServer != null) {
             btnToggleServer.setText("إيقاف السيرفر");
-            btnToggleServer.setBackgroundColor(ContextCompat.getColor(this, android.R.color.holo_red_dark));
-            logMessage("✅ تم تشغيل السيرفر على المنفذ [" + port + "] وهو مستعد للاستقبال...");
-        } catch (IOException e) {
-            logMessage("❌ فشل تشغيل السيرفر: " + e.getMessage());
         }
+        Toast.makeText(MainActivity.this, "تم تشغيل الخادم بنجاح", Toast.LENGTH_SHORT).show();
+
+        serverThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    serverSocket = new ServerSocket(SERVER_PORT);
+                    while (isServerRunning) {
+                        final Socket socket = serverSocket.accept();
+                        handleClientRequest(socket);
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        serverThread.start();
     }
 
     private void stopServer() {
-        if (smsServer != null) {
-            smsServer.stop();
-            isServerRunning = false;
-            
-            etServerPort.setEnabled(true);
-            btnToggleServer.setText("تشغيل السيرفر");
-            btnToggleServer.setBackgroundColor(ContextCompat.getColor(this, android.R.color.holo_green_dark));
-            logMessage("🛑 تم إيقاف السيرفر يدوياً.");
-        }
-    }
-
-    // جلب عنوان الـ IP الخاص بالواي فاي تلقائياً
-    private String getWifiIpAddress() {
-        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
-        int ipAddress = wifiManager.getConnectionInfo().getIpAddress();
-        if (ByteOrder.nativeOrder().equals(ByteOrder.LITTLE_ENDIAN)) {
-            ipAddress = Integer.reverseBytes(ipAddress);
-        }
-        byte[] ipByteArray = BigInteger.valueOf(ipAddress).toByteArray();
-        String ipAddressString;
+        isServerRunning = false;
         try {
-            ipAddressString = InetAddress.getByAddress(ipByteArray).getHostAddress();
-        } catch (UnknownHostException ex) {
-            ipAddressString = "0.0.0.0";
+            if (serverSocket != null) {
+                serverSocket.close();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-        return ipAddressString;
+        if (serverThread != null) {
+            serverThread.interrupt();
+        }
+        if (tvServerStatus != null) {
+            tvServerStatus.setText("حالة السيرفر: متوقف 🔴");
+            tvServerStatus.setTextColor(0xFFFF5252);
+        }
+        if (btnToggleServer != null) {
+            btnToggleServer.setText("تشغيل السيرفر");
+        }
+        Toast.makeText(this, "تم إيقاف السيرفر", Toast.LENGTH_SHORT).show();
     }
 
-    // دالة تحديث سجل المراقبة والـ Logs على الواجهة
-    private void logMessage(final String message) {
-        runOnUiThread(new Runnable() {
+    private void handleClientRequest(final Socket socket) {
+        new Thread(new Runnable() {
             @Override
             public void run() {
-                tvLogs.append(message + "\n");
-            }
-        });
-    }
-
-    // دالة إرسال الـ SMS الفعلية عبر الشريحة وتحديث العدادات
-    public void sendSmsMessage(String phoneNumber, String messageText) {
-        try {
-            SmsManager smsManager = SmsManager.getDefault();
-            smsManager.sendTextMessage(phoneNumber, null, messageText, null, null);
-            
-            successCounter++;
-            tvSuccessCount.setText(String.valueOf(successCounter));
-            logMessage("🚀 [تم الإرسال بنجاح] للرقم: " + phoneNumber);
-        } catch (Exception e) {
-            failedCounter++;
-            tvFailedCount.setText(String.valueOf(failedCounter));
-            logMessage("❌ [فشل الإرسال] للرقم: " + phoneNumber + " السبب: " + e.getMessage());
-        }
-    }
-
-    // التحقق من الصلاحيات
-    private void checkSmsPermission() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.SEND_SMS}, SMS_PERMISSION_CODE);
-        }
-    }
-
-    // كلاس السيرفر الداخلي الذي يستقبل طلبات Node.js ويعالجها
-    private class MySmsServer extends NanoHTTPD {
-        public MySmsServer(int port) {
-            super(port);
-        }
-
-        @Override
-        public Response serve(IHTTPSession session) {
-            String uri = session.getUri();
-            
-            // استقبال المسار /send المتوافق مع سكريبت Node.js لديك
-            if (uri.equals("/send")) {
-                Map<String, List<String>> decodedParameters = session.getParameters();
-                
-                String rawPhone = decodedParameters.get("phone") != null ? decodedParameters.get("phone").get(0) : null;
-                String rawMessage = decodedParameters.get("message") != null ? decodedParameters.get("message").get(0) : null;
-
                 try {
-                    // فك ترميز النصوص لحل مشاكل اللغة العربية المسلمة عبر الرابط
-                    final String phone = rawPhone != null ? URLDecoder.decode(rawPhone, "UTF-8") : null;
-                    final String message = rawMessage != null ? URLDecoder.decode(rawMessage, "UTF-8") : null;
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                    String requestLine = reader.readLine();
+                    if (requestLine == null) return;
 
-                    if (phone != null && message != null) {
-                        logMessage("📥 طلب وارد من Node.js لإرسال رسالة إلى: " + phone);
-                        
-                        // تشغيل الإرسال وتحديث العدادات على الواجهة الرئيسية للأندرويد
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                sendSmsMessage(phone, message);
+                    String[] requestParts = requestLine.split(" ");
+                    String responseText = "Missing params. Use: /send?phone=X&message=Y";
+
+                    if (requestParts.length > 1) {
+                        String urlPath = requestParts[1]; 
+                        if (urlPath.startsWith("/send")) {
+                            int queryIndex = urlPath.indexOf("?");
+                            String queryString = (queryIndex != -1) ? urlPath.substring(queryIndex + 1) : "";
+                            Map<String, String> params = parseQuery(queryString);
+
+                            String phone = params.get("phone");
+                            String message = params.get("message");
+
+                            if (phone != null && message != null) {
+                                try {
+                                    SmsManager smsManager = SmsManager.getDefault();
+                                    smsManager.sendTextMessage(phone, null, message, null, null);
+                                    responseText = "Success: Message sent to " + phone;
+
+                                    runOnUiThread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            messageCount++;
+                                            updateMessageCount();
+                                        }
+                                    });
+                                } catch (Exception e) {
+                                    responseText = "Error: " + e.getMessage();
+                                }
                             }
-                        });
-                        
-                        // الرد المطلوب الذي ينتظره سكريبت Node.js (Success) ليقوم بتحديث الجدول
-                        return newFixedLengthResponse(Response.Status.OK, MIME_PLAINTEXT, "Success");
+                        }
                     }
+
+                    OutputStream output = socket.getOutputStream();
+                    byte[] responseBytes = responseText.getBytes("UTF-8");
+                    
+                    output.write("HTTP/1.1 200 OK\r\n".getBytes());
+                    output.write("Content-Type: text/plain; charset=utf-8\r\n".getBytes());
+                    output.write(("Content-Length: " + responseBytes.length + "\r\n").getBytes());
+                    output.write("\r\n".getBytes());
+                    output.write(responseBytes);
+                    output.flush();
+                    
+                    socket.close();
                 } catch (Exception e) {
-                    logMessage("❌ خطأ في فك ترميز نصوص الرسالة الواردة.");
+                    e.printStackTrace();
                 }
             }
-            return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_PLAINTEXT, "Invalid Request");
+        }).start();
+    }
+
+    private Map<String, String> parseQuery(String query) {
+        Map<String, String> result = new HashMap<>();
+        if (query == null || query.isEmpty()) return result;
+        try {
+            for (String param : query.split("&")) {
+                String[] pair = param.split("=");
+                if (pair.length > 1) {
+                    String key = pair[0]; 
+                    String value = URLDecoder.decode(pair[1], "UTF-8"); 
+                    result.put(key, value);
+                } else if (pair.length > 0) {
+                    result.put(pair[0], ""); 
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return result;
+    }
+
+    private void updateMessageCount() {
+        if (tvSentCount != null) {
+            tvSentCount.setText("الرسائل المستقبلة والمرسلة: " + messageCount);
         }
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        updateIpDisplay(); // تحديث الـ IP في حال تغير الاتصال بالشبكة
+    private boolean isTrialExpired() {
+        Calendar expiryDate = Calendar.getInstance();
+        expiryDate.set(2026, Calendar.DECEMBER, 31);
+        Calendar today = Calendar.getInstance();
+        return today.after(expiryDate);
+    }
+
+    private void checkPermissions() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.SEND_SMS}, 100);
+        }
+    }
+
+    private String getDeviceIpAddress() {
+        try {
+            WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            if (wifiManager != null && wifiManager.isWifiEnabled() && wifiManager.getConnectionInfo() != null) {
+                int ipAddress = wifiManager.getConnectionInfo().getIpAddress();
+                if (ipAddress != 0) {
+                    return String.format(Locale.getDefault(), "%d.%d.%d.%d",
+                            (ipAddress & 0xff),
+                            (ipAddress >> 8 & 0xff),
+                            (ipAddress >> 16 & 0xff),
+                            (ipAddress >> 24 & 0xff));
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "127.0.0.1 (يرجى الاتصال بشبكة واي فاي)";
     }
 
     @Override
