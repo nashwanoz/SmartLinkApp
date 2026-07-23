@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://android.com">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- صلاحيات الإنترنت والشبكة المحلية للمستودع والسيرفر -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -16,7 +16,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar"
-        android:usesCleartextTraffic="true"> <!-- تفعيل هذا الخيار ضروري لاستقبال طلبات HTTP المحلية من Node.js -->
+        android:usesCleartextTraffic="true">
         
         <activity
             android:name=".MainActivity"
