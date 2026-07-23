@@ -37,7 +37,7 @@ public class MainActivity extends AppCompatActivity {
     private EditText etServerPort;
     private Button btnToggleServer;
     
-    // الأزرار الجديدة المضافة لربط الواجهة الاحترافية
+    // الأزرار المضافة لربط الواجهة الاحترافية الجديدة
     private Button btnSettings, btnDeveloper;
     
     private MySmsServer smsServer;
@@ -52,7 +52,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // ربط المعرفات البرمجية بالواجهة activity_main.xml الأصيلة
+        // ربط المعرفات البرمجية بالواجهة activity_main.xml
         tvServerIp = findViewById(R.id.tvServerIp);
         tvLogs = findViewById(R.id.tvLogs);
         tvSuccessCount = findViewById(R.id.tvSuccessCount);
@@ -85,12 +85,12 @@ public class MainActivity extends AppCompatActivity {
         // استدعاء دالة فحص الصلاحيات عند بدء التشغيل
         checkSmsPermission();
     }
+
     private void checkSmsPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.SEND_SMS}, SMS_PERMISSION_CODE);
         }
     }
-
     private class MySmsServer extends NanoHTTPD {
         public MySmsServer(int port) {
             super(port);
@@ -127,6 +127,58 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
             return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_PLAINTEXT, "Invalid Request");
+        }
+    }
+
+    // دالة طباعة السجلات والمراقبة داخل واجهة التطبيق
+    private void logMessage(final String msg) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (tvLogs != null) {
+                    tvLogs.append("\n" + msg);
+                }
+            }
+        });
+    }
+
+    // دالة جلب وتحديث عنوان الـ IP المحلي الخاص بالشبكة
+    private void updateIpDisplay() {
+        try {
+            WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            int ipAddress = wifiManager.getConnectionInfo().getIpAddress();
+            if (ByteOrder.nativeOrder().equals(ByteOrder.LITTLE_ENDIAN)) {
+                ipAddress = Integer.reverseBytes(ipAddress);
+            }
+            byte[] ipByteArray = BigInteger.valueOf(ipAddress).toByteArray();
+            String ipAddressString = InetAddress.getByAddress(ipByteArray).getHostAddress();
+            tvServerIp.setText("IP: " + ipAddressString);
+        } catch (UnknownHostException ex) {
+            tvServerIp.setText("IP: لا يمكن جلب العنوان");
+        }
+    }
+
+    // دالة إيقاف تشغيل خادم الويب المحلي بأمان
+    private void stopServer() {
+        if (smsServer != null && isServerRunning) {
+            smsServer.stop();
+            isServerRunning = false;
+            logMessage("🔴 تم إيقاف الخادم المحلي.");
+        }
+    }
+
+    // دالة معالجة وإرسال الرسائل النصية عبر شريحة الهاتف وتحديث العدادات
+    private void sendSmsMessage(String phoneNumber, String messageContent) {
+        try {
+            SmsManager smsManager = SmsManager.getDefault();
+            smsManager.sendTextMessage(phoneNumber, null, messageContent, null, null);
+            successCounter++;
+            tvSuccessCount.setText(String.valueOf(successCounter));
+            logMessage("✅ تم إرسال الرسالة بنجاح إلى: " + phoneNumber);
+        } catch (Exception e) {
+            failedCounter++;
+            tvFailedCount.setText(String.valueOf(failedCounter));
+            logMessage("❌ فشل إرسال الرسالة إلى: " + phoneNumber);
         }
     }
 
