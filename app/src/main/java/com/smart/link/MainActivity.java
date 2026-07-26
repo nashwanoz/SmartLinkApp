@@ -32,17 +32,14 @@ public class MainActivity extends AppCompatActivity {
     private static final String PREFS_NAME = "SmartLinkPrefs";
     private static final String KEY_SUCCESS = "success_count";
     private static final String KEY_FAILED = "failed_count";
-    
+
     private TextView tvServerIp, tvLogs, tvSuccessCount, tvFailedCount;
     private EditText etServerPort;
-    private Button btnToggleServer;
-    
-    // الأزرار المضافة لربط الواجهة الاحترافية الجديدة
-    private Button btnSettings, btnDeveloper;
-    
+    private Button btnToggleServer, btnSettings, btnDeveloper;
+
     private MySmsServer smsServer;
     private boolean isServerRunning = false;
-    
+
     private int successCounter = 0;
     private int failedCounter = 0;
     private SharedPreferences sharedPreferences;
@@ -52,37 +49,48 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // ربط المعرفات البرمجية بالواجهة activity_main.xml
+        // ربط عناصر الواجهة
         tvServerIp = findViewById(R.id.tvServerIp);
         tvLogs = findViewById(R.id.tvLogs);
         tvSuccessCount = findViewById(R.id.tvSuccessCount);
         tvFailedCount = findViewById(R.id.tvFailedCount);
         etServerPort = findViewById(R.id.etServerPort);
         btnToggleServer = findViewById(R.id.btnToggleServer);
-
-        // ربط أزرار التنقل الجديدة بالواجهة الحديثة
         btnSettings = findViewById(R.id.btnSettings);
         btnDeveloper = findViewById(R.id.btnDeveloper);
 
-        // تشغيل صفحة الإعدادات عند الضغط عليها
-        btnSettings.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent intent = new Intent(MainActivity.this, SettingsActivity.class);
-                startActivity(intent);
+        // زر الإعدادات
+        btnSettings.setOnClickListener(v -> {
+            Intent intent = new Intent(MainActivity.this, SettingsActivity.class);
+            startActivity(intent);
+        });
+
+        // زر المطور
+        btnDeveloper.setOnClickListener(v -> {
+            Intent intent = new Intent(MainActivity.this, DeveloperActivity.class);
+            startActivity(intent);
+        });
+
+        // زر تشغيل/إيقاف الخادم
+        btnToggleServer.setOnClickListener(v -> {
+            if (!isServerRunning) {
+                int port = Integer.parseInt(etServerPort.getText().toString());
+                smsServer = new MySmsServer(port);
+                try {
+                    smsServer.start();
+                    isServerRunning = true;
+                    logMessage("🟢 تم تشغيل الخادم على المنفذ: " + port);
+                    btnToggleServer.setText(getString(R.string.main_toggle_stop));
+                } catch (IOException e) {
+                    logMessage("❌ فشل تشغيل الخادم: " + e.getMessage());
+                }
+            } else {
+                stopServer();
+                btnToggleServer.setText(getString(R.string.main_toggle_start));
             }
         });
 
-        // تشغيل صفحة المطور عند الضغط عليها
-        btnDeveloper.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent intent = new Intent(MainActivity.this, DeveloperActivity.class);
-                startActivity(intent);
-            }
-        });
-        
-        // استدعاء دالة فحص الصلاحيات عند بدء التشغيل
+        // فحص صلاحيات SMS
         checkSmsPermission();
     }
 
@@ -91,6 +99,7 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.SEND_SMS}, SMS_PERMISSION_CODE);
         }
     }
+
     private class MySmsServer extends NanoHTTPD {
         public MySmsServer(int port) {
             super(port);
@@ -99,10 +108,10 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public Response serve(IHTTPSession session) {
             String uri = session.getUri();
-            
+
             if (uri.equals("/send")) {
                 Map<String, List<String>> decodedParameters = session.getParameters();
-                
+
                 String rawPhone = decodedParameters.get("phone") != null ? decodedParameters.get("phone").get(0) : null;
                 String rawMessage = decodedParameters.get("message") != null ? decodedParameters.get("message").get(0) : null;
 
@@ -111,15 +120,10 @@ public class MainActivity extends AppCompatActivity {
                     final String message = rawMessage != null ? URLDecoder.decode(rawMessage, "UTF-8") : null;
 
                     if (phone != null && message != null) {
-                        logMessage("📥 تم العثور على رساله الى : " + phone);
-                        
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                sendSmsMessage(phone, message);
-                            }
-                        });
-                        
+                        logMessage("📥 تم العثور على رسالة إلى: " + phone);
+
+                        runOnUiThread(() -> sendSmsMessage(phone, message));
+
                         return newFixedLengthResponse(Response.Status.OK, MIME_PLAINTEXT, "Success");
                     }
                 } catch (Exception e) {
@@ -130,19 +134,14 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // دالة طباعة السجلات والمراقبة داخل واجهة التطبيق
     private void logMessage(final String msg) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                if (tvLogs != null) {
-                    tvLogs.append("\n" + msg);
-                }
+        runOnUiThread(() -> {
+            if (tvLogs != null) {
+                tvLogs.append("\n" + msg);
             }
         });
     }
 
-    // دالة جلب وتحديث عنوان الـ IP المحلي الخاص بالشبكة
     private void updateIpDisplay() {
         try {
             WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
@@ -158,7 +157,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // دالة إيقاف تشغيل خادم الويب المحلي بأمان
     private void stopServer() {
         if (smsServer != null && isServerRunning) {
             smsServer.stop();
@@ -167,7 +165,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // دالة معالجة وإرسال الرسائل النصية عبر شريحة الهاتف وتحديث العدادات
     private void sendSmsMessage(String phoneNumber, String messageContent) {
         try {
             SmsManager smsManager = SmsManager.getDefault();
