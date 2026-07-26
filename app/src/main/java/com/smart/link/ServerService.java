@@ -23,7 +23,7 @@ public class ServerService extends Service {
         Notification notification = new NotificationCompat.Builder(this, "server_channel")
                 .setContentTitle("برنامج الربط الذكي")
                 .setContentText("السيرفر قيد العمل")
-                .setSmallIcon(R.drawable.ic_server) // ضع أيقونة مناسبة
+                .setSmallIcon(R.mipmap.ic_launcher) // استخدام أيقونة التطبيق
                 .setOngoing(true)
                 .build();
 
