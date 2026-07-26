@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F4F6F9">
+    android:background="#F4F6F9"
     android:layoutDirection="rtl">
 
     <!-- أولاً: رأس الشاشة (Header) المموج أو المتدرج -->
@@ -11,7 +11,7 @@
         android:id="@+id/layoutHeader"
         android:layout_width="match_parent"
         android:layout_height="180dp"
-        android:background="@drawable/header_gradient_bg" 
+        android:background="@drawable/header_gradient_bg"
         android:orientation="vertical"
         android:gravity="center"
         android:padding="16dp">
@@ -115,7 +115,7 @@
         </androidx.cardview.widget.CardView>
     </LinearLayout>
 
-    <!-- ثالثاً: سجل العمليات والرسائل (الأكبر مساحة في المنتصف) -->
+    <!-- ثالثاً: سجل العمليات والرسائل -->
     <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -157,7 +157,7 @@
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
-    <!-- رابعاً: شريط التحكم السفلي (منفذ البورت وزر التشغيل الأنيق) -->
+    <!-- رابعاً: شريط التحكم السفلي -->
     <LinearLayout
         android:id="@+id/layoutControls"
         android:layout_width="match_parent"
@@ -211,7 +211,6 @@
             android:insetTop="0dp"
             android:insetBottom="0dp"/>
 
-        <!-- أزرار الإعدادات والمطور الإضافية (بشكل مسطح واحترافي أسفل الشاشة) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
