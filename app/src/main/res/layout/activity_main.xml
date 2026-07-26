@@ -3,10 +3,10 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F4F6F9"
+    android:background="@color/gray_light"
     android:layoutDirection="rtl">
 
-    <!-- أولاً: رأس الشاشة (Header) المموج أو المتدرج -->
+    <!-- أولاً: رأس الشاشة -->
     <LinearLayout
         android:id="@+id/layoutHeader"
         android:layout_width="match_parent"
@@ -24,7 +24,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="تطبيق الرسائل الذكي"
+            android:text="@string/app_name"
             android:textColor="#FFFFFF"
             android:textSize="20sp"
             android:textStyle="bold"
@@ -35,12 +35,12 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="IP: 0.0.0.0"
-            android:textColor="#E0E0E0"
+            android:textColor="@color/gray_text"
             android:textSize="14sp"
             android:layout_marginTop="4dp"/>
     </LinearLayout>
 
-    <!-- ثانياً: قسم الإحصائيات السريعة (تظهر كبطاقات عائمة) -->
+    <!-- ثانياً: قسم الإحصائيات -->
     <LinearLayout
         android:id="@+id/layoutStats"
         android:layout_width="match_parent"
@@ -69,15 +69,15 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="الناجحة"
-                    android:textColor="#757575"
+                    android:text="@string/main_success"
+                    android:textColor="@color/gray_secondary"
                     android:textSize="12sp"/>
                 <TextView
                     android:id="@+id/tvSuccessCount"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="0"
-                    android:textColor="#2E7D32"
+                    android:textColor="@color/blue_primary"
                     android:textSize="22sp"
                     android:textStyle="bold"/>
             </LinearLayout>
@@ -100,22 +100,22 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="الفاشلة"
-                    android:textColor="#757575"
+                    android:text="@string/main_failed"
+                    android:textColor="@color/gray_secondary"
                     android:textSize="12sp"/>
                 <TextView
                     android:id="@+id/tvFailedCount"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="0"
-                    android:textColor="#C62828"
+                    android:textColor="@color/red_error"
                     android:textSize="22sp"
                     android:textStyle="bold"/>
             </LinearLayout>
         </androidx.cardview.widget.CardView>
     </LinearLayout>
 
-    <!-- ثالثاً: سجل العمليات والرسائل -->
+    <!-- ثالثاً: سجل العمليات -->
     <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -134,8 +134,8 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="سجل العمليات المباشر (Logs)"
-                android:textColor="#37474F"
+                android:text="@string/main_logs_title"
+                android:textColor="@color/gray_secondary"
                 android:textStyle="bold"
                 android:textSize="14sp"
                 android:layout_marginBottom="8dp"/>
@@ -149,15 +149,15 @@
                     android:id="@+id/tvLogs"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="بانتظار بدء تشغيل الخادم..."
-                    android:textColor="#555555"
+                    android:text="@string/main_logs_waiting"
+                    android:textColor="@color/gray_text"
                     android:textSize="13sp"
                     android:lineSpacingExtra="4dp"/>
             </ScrollView>
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
-    <!-- رابعاً: شريط التحكم السفلي -->
+    <!-- رابعاً: شريط التحكم -->
     <LinearLayout
         android:id="@+id/layoutControls"
         android:layout_width="match_parent"
@@ -192,8 +192,8 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="منفذ الخادم (Port):"
-                android:textColor="#37474F"
+                android:text="@string/main_port_label"
+                android:textColor="@color/gray_secondary"
                 android:layout_marginLeft="12dp"
                 android:textStyle="bold"/>
         </LinearLayout>
@@ -202,12 +202,11 @@
             android:id="@+id/btnToggleServer"
             android:layout_width="match_parent"
             android:layout_height="54dp"
-            android:text="تشغيل الخادم"
+            android:text="@string/main_toggle_start"
             android:textColor="#FFFFFF"
             android:textStyle="bold"
             android:textSize="16sp"
-            android:backgroundTint="#1E88E5"
-            app:backgroundTint="#1E88E5"
+            android:background="@color/blue_primary"
             android:insetTop="0dp"
             android:insetBottom="0dp"/>
 
@@ -224,8 +223,8 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="ℹ️ حول المطور"
-                android:textColor="#78909C"
+                android:text="@string/main_developer_button"
+                android:textColor="@color/gray_text"
                 android:textSize="13sp"/>
 
             <Button
@@ -234,10 +233,9 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="⚙️ إعدادات التطبيق"
-                android:textColor="#78909C"
+                android:text="@string/main_settings_button"
+                android:textColor="@color/gray_text"
                 android:textSize="13sp"/>
         </LinearLayout>
     </LinearLayout>
-
 </RelativeLayout>
