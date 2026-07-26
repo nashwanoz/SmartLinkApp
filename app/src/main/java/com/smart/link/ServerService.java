@@ -19,7 +19,7 @@ public class ServerService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // هنا يبدأ الخادم الحقيقي (ضع كود السيرفر الخاص بك)
+        // إشعار دائم عند تشغيل الخادم
         Notification notification = new NotificationCompat.Builder(this, "server_channel")
                 .setContentTitle("برنامج الربط الذكي")
                 .setContentText("السيرفر قيد العمل")
@@ -27,14 +27,17 @@ public class ServerService extends Service {
                 .setOngoing(true)
                 .build();
 
+        // تشغيل الخدمة في المقدمة مع إشعار
         startForeground(1, notification);
+
+        // هنا ضع كود تشغيل السيرفر الفعلي
         return START_STICKY;
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        // هنا توقف الخادم
+        // هنا ضع كود إيقاف السيرفر إذا لزم
     }
 
     @Override
@@ -50,7 +53,9 @@ public class ServerService extends Service {
                     NotificationManager.IMPORTANCE_DEFAULT
             );
             NotificationManager manager = getSystemService(NotificationManager.class);
-            manager.createNotificationChannel(serviceChannel);
+            if (manager != null) {
+                manager.createNotificationChannel(serviceChannel);
+            }
         }
     }
 }
