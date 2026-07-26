@@ -11,8 +11,8 @@ import android.telephony.SmsManager;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
-import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -36,6 +36,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView tvServerIp, tvLogs, tvSuccessCount, tvFailedCount;
     private EditText etServerPort;
     private Button btnToggleServer, btnSettings, btnDeveloper;
+    private ImageView imgLogo;
 
     private MySmsServer smsServer;
     private boolean isServerRunning = false;
@@ -58,6 +59,10 @@ public class MainActivity extends AppCompatActivity {
         btnToggleServer = findViewById(R.id.btnToggleServer);
         btnSettings = findViewById(R.id.btnSettings);
         btnDeveloper = findViewById(R.id.btnDeveloper);
+        imgLogo = findViewById(R.id.imgLogo);
+
+        // تحميل الصورة من drawable
+        imgLogo.setImageResource(R.drawable.logo_smartlink);
 
         // زر الإعدادات
         btnSettings.setOnClickListener(v -> {
@@ -95,8 +100,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void checkSmsPermission() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.SEND_SMS}, SMS_PERMISSION_CODE);
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.SEND_SMS}, SMS_PERMISSION_CODE);
         }
     }
 
@@ -112,8 +119,10 @@ public class MainActivity extends AppCompatActivity {
             if (uri.equals("/send")) {
                 Map<String, List<String>> decodedParameters = session.getParameters();
 
-                String rawPhone = decodedParameters.get("phone") != null ? decodedParameters.get("phone").get(0) : null;
-                String rawMessage = decodedParameters.get("message") != null ? decodedParameters.get("message").get(0) : null;
+                String rawPhone = decodedParameters.get("phone") != null
+                        ? decodedParameters.get("phone").get(0) : null;
+                String rawMessage = decodedParameters.get("message") != null
+                        ? decodedParameters.get("message").get(0) : null;
 
                 try {
                     final String phone = rawPhone != null ? URLDecoder.decode(rawPhone, "UTF-8") : null;
