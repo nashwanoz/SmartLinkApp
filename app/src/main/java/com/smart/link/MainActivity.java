@@ -26,7 +26,6 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // ربط العناصر
         imgLogo = findViewById(R.id.imgLogo);
         tvServerIp = findViewById(R.id.tvServerIp);
         tvSuccessCount = findViewById(R.id.tvSuccessCount);
@@ -37,7 +36,6 @@ public class MainActivity extends AppCompatActivity {
         btnDeveloper = findViewById(R.id.btnDeveloper);
         btnSettings = findViewById(R.id.btnSettings);
 
-        // زر تشغيل/إيقاف الخادم
         btnToggleServer.setOnClickListener(v -> {
             if (!serverRunning) {
                 startServerService();
@@ -54,30 +52,25 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // زر المطور
         btnDeveloper.setOnClickListener(v -> {
             startActivity(new Intent(MainActivity.this, DeveloperActivity.class));
         });
 
-        // زر الإعدادات
         btnSettings.setOnClickListener(v -> {
             startActivity(new Intent(MainActivity.this, SettingsActivity.class));
         });
     }
 
-    // تشغيل الخدمة مع إشعار دائم
     private void startServerService() {
         Intent serviceIntent = new Intent(this, ServerService.class);
-        startService(serviceIntent);
+        // استخدام startForegroundService بدل startService
+        startForegroundService(serviceIntent);
     }
 
-    // إيقاف الخدمة
     private void stopServerService() {
         Intent serviceIntent = new Intent(this, ServerService.class);
         stopService(serviceIntent);
     }
-
-    // تأكيد الخروج عند الضغط على زر الرجوع
     @Override
     public void onBackPressed() {
         if (backPressedTime + 2000 > System.currentTimeMillis()) {
