@@ -5,7 +5,7 @@
     android:orientation="vertical"
     android:background="#FFFFFF"
     android:layoutDirection="rtl"
-    android:gravity="center"
+    android:gravity="center_horizontal"
     android:padding="24dp">
 
     <!-- صورة الشعار -->
@@ -15,6 +15,7 @@
         android:layout_height="150dp"
         android:src="@drawable/logo_smartlink"
         android:contentDescription="@string/app_name"
+        android:elevation="6dp"
         android:layout_marginBottom="24dp"/>
 
     <!-- اسم التطبيق -->
@@ -34,7 +35,7 @@
         android:text="@string/app_description"
         android:textColor="@color/gray_secondary"
         android:textSize="16sp"
-        android:layout_marginBottom="24dp"/>
+        android:layout_marginBottom="16dp"/>
 
     <!-- الإصدار -->
     <TextView
@@ -46,7 +47,7 @@
         android:textStyle="bold"
         android:background="#FFEBEE"
         android:padding="8dp"
-        android:layout_marginBottom="48dp"/>
+        android:layout_marginBottom="32dp"/>
 
     <!-- اسم المطور -->
     <TextView
@@ -58,11 +59,13 @@
         android:textStyle="bold"
         android:layout_marginBottom="8dp"/>
 
-    <!-- رقم الهاتف -->
+    <!-- رقم الهاتف قابل للنقر -->
     <TextView
+        android:id="@+id/tvPhone"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/developer_phone"
+        android:autoLink="phone"
         android:textColor="@color/blue_primary"
         android:textSize="16sp"
         android:textStyle="bold"/>
