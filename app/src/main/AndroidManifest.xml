@@ -9,6 +9,10 @@
     <!-- صلاحية إرسال الرسائل النصية عبر الشريحة -->
     <uses-permission android:name="android.permission.SEND_SMS" />
 
+    <!-- صلاحيات تشغيل الخدمة في المقدمة (Foreground Service) للأندرويد الحديث -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -37,6 +41,13 @@
         <activity 
             android:name=".DeveloperActivity"
             android:exported="false" />
+
+        <!-- تسجيل خدمة السيرفر لتعمل في الخلفية والمقدمة بشكل مستقر -->
+        <service 
+            android:name=".ServerService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
 
     </application>
 
