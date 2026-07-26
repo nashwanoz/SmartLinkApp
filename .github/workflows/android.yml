@@ -1,7 +1,10 @@
 name: Android CI (Smart Link Build)
 
 on:
-  workflow_dispatch: # هذا السطر يجعل التشغيل يدوياً بالكامل عبر الضغط على الزر
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
 
 jobs:
   build:
