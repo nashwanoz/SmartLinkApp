@@ -27,7 +27,7 @@
             android:id="@+id/textTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="الشعوبي ماركت"
+            android:text="مطاعم الحاوري رويال"
             android:textSize="32sp"
             android:textStyle="bold"
             android:textColor="#1A237E"
@@ -38,7 +38,7 @@
             android:id="@+id/textSubtitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="متعة التسوق"
+            android:text="لأشهى وألذ المأكولات الشعبية"
             android:textSize="18sp"
             android:textColor="#757575"
             android:layout_marginBottom="24dp" />
