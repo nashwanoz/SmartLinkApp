@@ -9,7 +9,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -19,10 +18,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.smartlink.erp.data.local.entity.Bond
 import com.smartlink.erp.data.local.entity.Customer
 import com.smartlink.erp.data.local.entity.Invoice
@@ -33,6 +30,7 @@ import com.smartlink.erp.utils.WhatsAppUtils
 import java.text.SimpleDateFormat
 import java.util.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatementsScreen(
     customers: List<Customer>,
@@ -43,37 +41,28 @@ fun StatementsScreen(
     settings: SystemSettings,
     preselectedCustomerId: String? = null
 ) {
-    // Statement category tab
+    // State variables
     var statementType by remember { mutableStateOf("customer") }
-    
-    // Customer search & selection
     var customerSearchTerm by remember { mutableStateOf("") }
     var selectedCustomerId by remember { mutableStateOf(preselectedCustomerId ?: customers.firstOrNull()?.id ?: "") }
     var isCustomerSearchOpen by remember { mutableStateOf(false) }
+    var selectedCashierId by remember { mutableStateOf(users.firstOrNull { it.role == "CASHIER" }?.id ?: users.firstOrNull()?.id ?: "") }
     
-    // Selected Cashier
-    var selectedCashierId by remember { mutableStateOf(users.firstOrNull()?.id ?: "") }
-    
-    // Date filters
     val todayStr = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()) }
     var invoiceStartDate by remember { mutableStateOf(todayStr) }
     var invoiceEndDate by remember { mutableStateOf(todayStr) }
     var receiptStartDate by remember { mutableStateOf(todayStr) }
     var receiptEndDate by remember { mutableStateOf(todayStr) }
     
+    // Derived states
     val customer by remember {
-        derivedStateOf {
-            customers.find { c -> c.id == selectedCustomerId }
-        }
+        derivedStateOf { customers.find { c -> c.id == selectedCustomerId } }
     }
     
     val cashier by remember {
-        derivedStateOf {
-            users.find { u -> u.id == selectedCashierId }
-        }
+        derivedStateOf { users.find { u -> u.id == selectedCashierId } }
     }
     
-    // Filtered customers for search
     val filteredCustomers by remember {
         derivedStateOf {
             val term = customerSearchTerm.trim().lowercase()
@@ -86,27 +75,18 @@ fun StatementsScreen(
         }
     }
     
-    // Customer transactions
     val customerInvoices by remember {
-        derivedStateOf {
-            invoices.filter { inv -> inv.customerId == selectedCustomerId }
-        }
+        derivedStateOf { invoices.filter { inv -> inv.customerId == selectedCustomerId } }
     }
     
     val customerBonds by remember {
-        derivedStateOf {
-            bonds.filter { b -> b.customerId == selectedCustomerId }
-        }
+        derivedStateOf { bonds.filter { b -> b.customerId == selectedCustomerId } }
     }
     
-    // Last invoice
     val lastInvoice by remember {
-        derivedStateOf {
-            customerInvoices.maxByOrNull { it.date }
-        }
+        derivedStateOf { customerInvoices.maxByOrNull { it.date } }
     }
     
-    // Last payment
     val lastPayment by remember {
         derivedStateOf {
             val payments = mutableListOf<Pair<Long, String>>()
@@ -120,50 +100,35 @@ fun StatementsScreen(
         }
     }
     
-    // Net Balance
     val netBalance by remember {
-        derivedStateOf {
-            customer?.balance ?: 0.0
-        }
+        derivedStateOf { customer?.balance ?: 0.0 }
     }
     
-    // Cashier data
     val cashierInvoices by remember {
-        derivedStateOf {
-            invoices.filter { inv -> inv.cashierId == selectedCashierId }
-        }
+        derivedStateOf { invoices.filter { inv -> inv.cashierId == selectedCashierId } }
     }
     
     val cashierBonds by remember {
-        derivedStateOf {
-            bonds.filter { b -> b.cashierId == selectedCashierId && b.type == "RECEIPT" }
-        }
+        derivedStateOf { bonds.filter { b -> b.cashierId == selectedCashierId && b.type == "RECEIPT" } }
     }
     
     val cashierTotalSales by remember {
-        derivedStateOf {
-            cashierInvoices.sumOf { it.total }
-        }
+        derivedStateOf { cashierInvoices.sumOf { it.total } }
     }
     
     val cashierPaidInvoices by remember {
-        derivedStateOf {
-            cashierInvoices.sumOf { it.paidAmount }
-        }
+        derivedStateOf { cashierInvoices.sumOf { it.paidAmount } }
     }
     
     val cashierBondsCollected by remember {
-        derivedStateOf {
-            cashierBonds.sumOf { it.amount }
-        }
+        derivedStateOf { cashierBonds.sumOf { it.amount } }
     }
     
     val cashierDrawerCash by remember {
-        derivedStateOf {
-            cashierPaidInvoices + cashierBondsCollected
-        }
+        derivedStateOf { cashierPaidInvoices + cashierBondsCollected }
     }
     
+    // Main UI
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -296,6 +261,9 @@ fun StatementsScreen(
     }
 }
 
+// ============================================================================
+// TabButton Component
+// ============================================================================
 @Composable
 private fun TabButton(
     text: String,
@@ -335,6 +303,10 @@ private fun TabButton(
     }
 }
 
+// ============================================================================
+// CustomerStatementSection
+// ============================================================================
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CustomerStatementSection(
     customer: Customer?,
@@ -353,19 +325,17 @@ private fun CustomerStatementSection(
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Customer Selection with Direct Search Box
+        // Customer Selection Card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = Color.White
-            ),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(
                 modifier = Modifier.padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Search Box
+                // Search Box Header
                 Column(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -399,6 +369,7 @@ private fun CustomerStatementSection(
                         }
                     }
                     
+                    // Search TextField with Dropdown
                     Box {
                         OutlinedTextField(
                             value = customerSearchTerm,
@@ -455,17 +426,6 @@ private fun CustomerStatementSection(
                                     focusedBorderColor = Color(0xFFCBD5E1),
                                     unfocusedBorderColor = Color(0xFFCBD5E1)
                                 )
-                            },
-                            textStyle = if (customer != null) {
-                                LocalTextStyle.current.copy(
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = Color(0xFF134E4A)
-                                )
-                            } else {
-                                LocalTextStyle.current.copy(
-                                    fontSize = 12.sp
-                                )
                             }
                         )
                         
@@ -476,9 +436,7 @@ private fun CustomerStatementSection(
                                     .fillMaxWidth()
                                     .heightIn(max = 250.dp)
                                     .align(Alignment.BottomStart),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = Color.White
-                                ),
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
                                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
                                 border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                             ) {
@@ -566,9 +524,7 @@ private fun CustomerStatementSection(
                 if (customer != null) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFFF8FAFC)
-                        ),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
                         border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                     ) {
                         Column(
@@ -640,9 +596,7 @@ private fun CustomerStatementSection(
                             ) {
                                 Card(
                                     modifier = Modifier.weight(1f),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = Color.White
-                                    ),
+                                    colors = CardDefaults.cardColors(containerColor = Color.White),
                                     border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                                 ) {
                                     Column(
@@ -666,9 +620,7 @@ private fun CustomerStatementSection(
                                 
                                 Card(
                                     modifier = Modifier.weight(1f),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = Color.White
-                                    ),
+                                    colors = CardDefaults.cardColors(containerColor = Color.White),
                                     border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                                 ) {
                                     Column(
@@ -698,9 +650,7 @@ private fun CustomerStatementSection(
                             ) {
                                 Button(
                                     onClick = { /* TODO: Open interactive modal */ },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFF0F766E)
-                                    ),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     Icon(
@@ -720,9 +670,7 @@ private fun CustomerStatementSection(
                                 
                                 Button(
                                     onClick = { /* TODO: Generate PDF */ },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFF92400E)
-                                    ),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF92400E)),
                                     modifier = Modifier.height(44.dp)
                                 ) {
                                     Icon(
@@ -742,7 +690,6 @@ private fun CustomerStatementSection(
                                 
                                 Button(
                                     onClick = {
-                                        // TODO: Send WhatsApp
                                         val msg = buildCustomerStatementMessage(customer, settings, netBalance, customerInvoices, customerBonds)
                                         WhatsAppUtils.sendTextOnly(
                                             androidx.compose.ui.platform.LocalContext.current,
@@ -750,9 +697,7 @@ private fun CustomerStatementSection(
                                             msg
                                         )
                                     },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFF059669)
-                                    ),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
                                     modifier = Modifier.height(44.dp)
                                 ) {
                                     Icon(
@@ -778,27 +723,311 @@ private fun CustomerStatementSection(
     }
 }
 
-// TODO: Add CashierStatementSection, InventoryStatementSection
-
-private fun formatDateTime(timestamp: Long): String {
-    val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("ar"))
-    return sdf.format(Date(timestamp))
+// ============================================================================
+// CashierStatementSection
+// ============================================================================
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CashierStatementSection(
+    cashier: User,
+    cashierInvoices: List<Invoice>,
+    cashierBonds: List<Bond>,
+    cashierTotalSales: Double,
+    cashierPaidInvoices: Double,
+    cashierBondsCollected: Double,
+    cashierDrawerCash: Double,
+    users: List<User>,
+    selectedCashierId: String,
+    invoiceStartDate: String,
+    invoiceEndDate: String,
+    receiptStartDate: String,
+    receiptEndDate: String,
+    settings: SystemSettings,
+    onCashierSelect: (String) -> Unit,
+    onInvoiceStartDateChange: (String) -> Unit,
+    onInvoiceEndDateChange: (String) -> Unit,
+    onReceiptStartDateChange: (String) -> Unit,
+    onReceiptEndDateChange: (String) -> Unit
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // Select Cashier Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "اختر الكاشير / المستخدم (يبدأ من كود 101)",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF475569)
+                )
+                
+                OutlinedTextField(
+                    value = users.find { u -> u.id == selectedCashierId }?.name ?: "",
+                    onValueChange = {},
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = false,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        disabledBorderColor = Color(0xFFCBD5E1),
+                        disabledContainerColor = Color(0xFFF1F5F9),
+                        disabledTextColor = Color(0xFF1E293B)
+                    )
+                )
+                
+                // Liquidation & Drawer Summary Cards
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SummaryCard(
+                        title = "إجمالي مبيعات الفواتير:",
+                        value = String.format("%,.2f", cashierTotalSales),
+                        subtitle = "${cashierInvoices.size} فواتير",
+                        bgColor = Color(0xFFF0FDFA),
+                        borderColor = Color(0xFF99F6E4),
+                        valueColor = Color(0xFF134E4A),
+                        modifier = Modifier.weight(1f)
+                    )
+                    
+                    SummaryCard(
+                        title = "المقبوض نقداً بالفواتير:",
+                        value = String.format("%,.2f", cashierPaidInvoices),
+                        subtitle = "سداد فوري",
+                        bgColor = Color(0xFFECFDF5),
+                        borderColor = Color(0xFFA7F3D0),
+                        valueColor = Color(0xFF047857),
+                        modifier = Modifier.weight(1f)
+                    )
+                    
+                    SummaryCard(
+                        title = "المقبوض بسندات قبض:",
+                        value = String.format("%,.2f", cashierBondsCollected),
+                        subtitle = "${cashierBonds.size} سندات",
+                        bgColor = Color(0xFFFEF3C7),
+                        borderColor = Color(0xFFFDE68A),
+                        valueColor = Color(0xFF92400E),
+                        modifier = Modifier.weight(1f)
+                    )
+                    
+                    SummaryCard(
+                        title = "صافي الصندوق للتصفية:",
+                        value = String.format("%,.2f", cashierDrawerCash),
+                        subtitle = "نقدية توريد الصندوق",
+                        bgColor = Color(0xFF0F766E),
+                        borderColor = Color(0xFF0F766E),
+                        valueColor = Color.White,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+        
+        // Report Section 1: Invoices by Date Range
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.ReceiptLong,
+                            contentDescription = null,
+                            tint = Color(0xFF0D9488),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = "استعراض فواتير الكاشير حسب الفترة",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFF1E293B)
+                        )
+                    }
+                    
+                    Text(
+                        text = "0 فاتورة بالفترة",
+                        fontSize = 10.sp,
+                        color = Color(0xFF94A3B8),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = invoiceStartDate,
+                        onValueChange = onInvoiceStartDateChange,
+                        label = { Text("من تاريخ:", fontSize = 10.sp) },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF0D9488),
+                            unfocusedBorderColor = Color(0xFFCBD5E1)
+                        )
+                    )
+                    
+                    OutlinedTextField(
+                        value = invoiceEndDate,
+                        onValueChange = onInvoiceEndDateChange,
+                        label = { Text("إلى تاريخ:", fontSize = 10.sp) },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF0D9488),
+                            unfocusedBorderColor = Color(0xFFCBD5E1)
+                        )
+                    )
+                }
+                
+                Button(
+                    onClick = { /* TODO: Generate PDF */ },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "توليد كشف الفواتير PDF 📄",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+        
+        // Report Section 2: Receipts by Date Range
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.AttachMoney,
+                            contentDescription = null,
+                            tint = Color(0xFF047857),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = "المقبوضات والتحصيلات النقدية حسب الفترة",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFF1E293B)
+                        )
+                    }
+                    
+                    Text(
+                        text = "0 عملية مقبوضة",
+                        fontSize = 10.sp,
+                        color = Color(0xFF047857),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = receiptStartDate,
+                        onValueChange = onReceiptStartDateChange,
+                        label = { Text("من تاريخ:", fontSize = 10.sp) },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF059669),
+                            unfocusedBorderColor = Color(0xFFCBD5E1)
+                        )
+                    )
+                    
+                    OutlinedTextField(
+                        value = receiptEndDate,
+                        onValueChange = onReceiptEndDateChange,
+                        label = { Text("إلى تاريخ:", fontSize = 10.sp) },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF059669),
+                            unfocusedBorderColor = Color(0xFFCBD5E1)
+                        )
+                    )
+                }
+                
+                Button(
+                    onClick = { /* TODO: Generate PDF */ },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF047857)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "توليد كشف المقبوضات PDF 💵",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+    }
 }
 
-private fun buildCustomerStatementMessage(
-    customer: Customer,
+// ============================================================================
+// InventoryStatementSection
+// ============================================================================
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InventoryStatementSection(
+    products: List<Product>,
+    users: List<User>,
+    selectedCashierId: String,
     settings: SystemSettings,
-    netBalance: Double,
-    invoices: List<Invoice>,
-    bonds: List<Bond>
-): String {
-    val totalDebit = invoices.sumOf { it.total }
-    val totalCredit = bonds.filter { it.type == "RECEIPT" }.sumOf { it.amount } +
-                      invoices.sumOf { it.paidAmount }
-    
-    return """
-📑 *كشف حساب عميل - ${settings.businessName}*
-👤 *العميل:* ${customer.name} (كود: ${customer.cCode})
-📅 *التاريخ:* ${SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("ar")).format(Date())}
-
-🧾 *إجمالي المسحوبات:* ${String.format("%,.2f",
+    onCashierSelect: (String) -> Unit
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // Cashier
