@@ -1,7 +1,5 @@
 package com.smartlink.erp.screens
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -26,13 +24,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.smartlink.kerp.data.local.entity.Bond
-import com.smartlink.kerp.data.local.entity.BondType
-import com.smartlink.kerp.data.local.entity.Customer
-import com.smartlink.kerp.data.local.entity.SystemSettings
-import com.smartlink.kerp.data.local.entity.User
-import com.smartlink.kerp.utils.NumberToArabicWords
-import com.smartlink.kerp.utils.WhatsAppTemplates
+import com.smartlink.erp.data.local.entity.Bond
+import com.smartlink.erp.data.local.entity.Customer
+import com.smartlink.erp.data.local.entity.SystemSettings
+import com.smartlink.erp.data.local.entity.User
+import com.smartlink.erp.utils.WhatsAppUtils
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -48,7 +44,6 @@ fun BondsScreen(
     onClearPreselectedCustomer: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     
     var searchTerm by remember { mutableStateOf("") }
     var isModalOpen by remember { mutableStateOf(false) }
@@ -60,7 +55,7 @@ fun BondsScreen(
     val isAdmin = currentUser.role == "ADMIN"
     
     // Form states
-    var formType by remember { mutableStateOf(BondType.RECEIPT) }
+    var formType by remember { mutableStateOf("RECEIPT") }
     var selectedCustomerId by remember { mutableStateOf(preselectedCustomer?.id ?: "") }
     var customerSearchInput by remember { mutableStateOf("") }
     var showCustomerResults by remember { mutableStateOf(false) }
@@ -69,7 +64,9 @@ fun BondsScreen(
     var errorMsg by remember { mutableStateOf("") }
     
     val selectedCustomer by remember {
-        derivedStateOf { customers.find { c -> c.id == selectedCustomerId } }
+        derivedStateOf {
+            selectedCustomerId.let { id -> customers.find { c -> c.id == id } }
+        }
     }
     
     val searchedCustomers by remember {
@@ -84,27 +81,17 @@ fun BondsScreen(
         }
     }
     
-    // Handle preselected customer
-    LaunchedEffect(preselectedCustomer) {
-        preselectedCustomer?.let { customer ->
-            selectedCustomerId = customer.id
-            customerSearchInput = "[${customer.cCode}] ${customer.name}"
-            isModalOpen = true
-            onClearPreselectedCustomer?.invoke()
-        }
-    }
-    
     fun nextBondNumber(): String {
         if (bonds.isEmpty()) return "685"
         val nums = bonds.mapNotNull { b -> b.bondNumber.toIntOrNull() }
         if (nums.isEmpty()) return "685"
-        return (nums.max() + 1).toString()
+        return (maxOf(nums) + 1).toString()
     }
     
-    fun openAddModal(type: BondType = BondType.RECEIPT) {
+    fun openAddModal(type: String = "RECEIPT") {
         formType = type
         formAmount = ""
-        formNote = if (type == BondType.RECEIPT) "قبض" else "صرف"
+        formNote = if (type == "RECEIPT") "قبض" else "صرف"
         errorMsg = ""
         if (preselectedCustomer == null) {
             selectedCustomerId = ""
@@ -130,7 +117,7 @@ fun BondsScreen(
         }
         
         val prevBalance = customer.balance
-        val newBalance = if (formType == BondType.RECEIPT) {
+        val newBalance = if (formType == "RECEIPT") {
             prevBalance - amt
         } else {
             prevBalance + amt
@@ -143,12 +130,12 @@ fun BondsScreen(
             customerId = customer.id,
             customerCode = customer.cCode,
             customerName = customer.name,
-            customerMobile = customer.mobile,
+            customerMobile = customer.mobile ?: "",
             cashierId = currentUser.id,
             cashierCode = currentUser.userCode,
             cashierName = currentUser.name,
             amount = amt,
-            note = formNote.trim().ifEmpty { if (formType == BondType.RECEIPT) "قبض" else "صرف" },
+            note = formNote.trim().ifEmpty { if (formType == "RECEIPT") "قبض" else "صرف" },
             prevCustomerBalance = prevBalance,
             newCustomerBalance = newBalance,
             date = System.currentTimeMillis()
@@ -159,7 +146,7 @@ fun BondsScreen(
         isModalOpen = false
     }
     
-    val filteredBonds by remember {
+    val filtered by remember {
         derivedStateOf {
             val s = searchTerm.lowercase().trim()
             if (s.isEmpty()) bonds
@@ -171,19 +158,14 @@ fun BondsScreen(
         }
     }
     
-    // Reset copied bond ID after 2 seconds
-    LaunchedEffect(copiedBondId) {
-        if (copiedBondId != null) {
-            kotlinx.coroutines.delay(2000)
-            copiedBondId = null
+    // Handle preselected customer
+    LaunchedEffect(preselectedCustomer) {
+        preselectedCustomer?.let { customer ->
+            selectedCustomerId = customer.id
+            customerSearchInput = "[${customer.cCode}] ${customer.name}"
+            isModalOpen = true
+            onClearPreselectedCustomer?.invoke()
         }
-    }
-    
-    fun copyToClipboard(text: String) {
-        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val clip = ClipData.newPlainText("Bond Message", text)
-        clipboard.setPrimaryClip(clip)
-        Toast.makeText(context, "تم نسخ النص", Toast.LENGTH_SHORT).show()
     }
     
     LazyColumn(
@@ -200,12 +182,23 @@ fun BondsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text(
-                        text = "سندات القبض والصرف (رسائل نصية واتساب)",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFF1E293B)
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Description,
+                            contentDescription = null,
+                            tint = Color(0xFF047857),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "سندات القبض والصرف (رسائل نصية واتساب)",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFF1E293B)
+                        )
+                    }
                     Text(
                         text = "إشعار فوري للعميل بحركة الحساب والرصيد السابق والجديد",
                         fontSize = 10.sp,
@@ -217,7 +210,7 @@ fun BondsScreen(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Button(
-                        onClick = { openAddModal(BondType.RECEIPT) },
+                        onClick = { openAddModal("RECEIPT") },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF047857)
                         ),
@@ -226,18 +219,20 @@ fun BondsScreen(
                         Icon(
                             Icons.Default.Add,
                             contentDescription = null,
+                            tint = Color.White,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(
                             text = "+ سند قبض",
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.Black
+                            fontWeight = FontWeight.Black,
+                            color = Color.White
                         )
                     }
                     
                     Button(
-                        onClick = { openAddModal(BondType.PAYMENT) },
+                        onClick = { openAddModal("PAYMENT") },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFFE11D48)
                         ),
@@ -246,13 +241,15 @@ fun BondsScreen(
                         Icon(
                             Icons.Default.Add,
                             contentDescription = null,
+                            tint = Color.White,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(
                             text = "+ صرف",
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.Black
+                            fontWeight = FontWeight.Black,
+                            color = Color.White
                         )
                     }
                 }
@@ -296,29 +293,32 @@ fun BondsScreen(
         }
         
         // Bonds List
-        items(filteredBonds, key = { it.id }) { bond ->
-            BondItem(
+        items(filtered, key = { it.id }) { bond ->
+            BondCard(
                 bond = bond,
                 settings = settings,
                 isAdmin = isAdmin,
-                copiedBondId = copiedBondId,
-                onCopyClick = { 
-                    val msg = WhatsAppTemplates.formatBondWhatsAppMessage(bond, settings)
-                    copyToClipboard(msg)
-                    copiedBondId = bond.id
+                context = context,
+                customers = customers,
+                onPreviewClick = { selectedBondForPreview = bond },
+                onDeleteClick = { bondToDelete = bond },
+                onCopyClick = {
+                    val msg = formatBondWhatsAppMessage(bond, settings)
+                    val success = WhatsAppUtils.copyToClipboard(context, msg)
+                    if (success) {
+                        copiedBondId = bond.id
+                    }
                 },
                 onWhatsAppClick = {
-                    val msg = WhatsAppTemplates.formatBondWhatsAppMessage(bond, settings)
-                    WhatsAppTemplates.sendToWhatsApp(context, bond.customerMobile ?: "", msg)
+                    val msg = formatBondWhatsAppMessage(bond, settings)
+                    WhatsAppUtils.sendTextOnly(context, bond.customerMobile, msg)
                 },
-                onPreviewClick = { selectedBondForPreview = bond },
-                onPrintClick = { /* TODO: Implement print */ },
-                onDeleteClick = { bondToDelete = bond }
+                isCopied = copiedBondId == bond.id
             )
         }
         
         // Empty state
-        if (filteredBonds.isEmpty()) {
+        if (filtered.isEmpty()) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -346,29 +346,28 @@ fun BondsScreen(
     
     // CREATE BOND MODAL
     if (isModalOpen) {
-        CreateBondModal(
+        BondModal(
             formType = formType,
-            customers = customers,
-            selectedCustomerId = selectedCustomerId,
+            selectedCustomer = selectedCustomer,
             customerSearchInput = customerSearchInput,
-            showCustomerResults = showCustomerResults,
+            searchedCustomers = searchedCustomers,
             formAmount = formAmount,
             formNote = formNote,
             errorMsg = errorMsg,
             settings = settings,
+            showCustomerResults = showCustomerResults,
             onTypeChange = { formType = it },
-            onCustomerSearchChange = { 
+            onCustomerSearchChange = {
                 customerSearchInput = it
                 showCustomerResults = true
                 if (selectedCustomerId.isNotEmpty()) selectedCustomerId = ""
             },
-            onCustomerSelected = { customerId, displayText ->
-                selectedCustomerId = customerId
-                customerSearchInput = displayText
+            onCustomerSelect = { customer ->
+                selectedCustomerId = customer.id
+                customerSearchInput = "[${customer.cCode}] ${customer.name}"
                 showCustomerResults = false
                 errorMsg = ""
             },
-            onShowResultsChange = { showCustomerResults = it },
             onAmountChange = { formAmount = it },
             onNoteChange = { formNote = it },
             onClose = { isModalOpen = false },
@@ -378,75 +377,71 @@ fun BondsScreen(
     
     // INSTANT WHATSAPP SEND DIALOG AFTER CREATING BOND
     lastCreatedBond?.let { bond ->
-        WhatsAppSendDialog(
+        CreatedBondDialog(
             bond = bond,
             settings = settings,
+            context = context,
+            customers = customers,
             copiedBondId = copiedBondId,
-            onCopyClick = {
-                val msg = WhatsAppTemplates.formatBondWhatsAppMessage(bond, settings)
-                copyToClipboard(msg)
-                copiedBondId = "modal-created"
-            },
+            onCopySuccess = { copiedBondId = it },
+            onPrintClick = { /* TODO: Print bond */ },
             onWhatsAppClick = {
-                val msg = WhatsAppTemplates.formatBondWhatsAppMessage(bond, settings)
-                WhatsAppTemplates.sendToWhatsApp(context, bond.customerMobile ?: "", msg)
+                val msg = formatBondWhatsAppMessage(bond, settings)
+                WhatsAppUtils.sendTextOnly(context, bond.customerMobile, msg)
             },
-            onPrintClick = { /* TODO: Implement print */ },
             onClose = { lastCreatedBond = null }
         )
     }
     
-    // BOND PREVIEW MODAL
+    // DETAILED BOND THERMAL PREVIEW MODAL
     selectedBondForPreview?.let { bond ->
         BondPreviewModal(
             bond = bond,
             settings = settings,
+            context = context,
+            customers = customers,
             isAdmin = isAdmin,
-            onCopyClick = {
-                val msg = WhatsAppTemplates.formatBondWhatsAppMessage(bond, settings)
-                copyToClipboard(msg)
-            },
-            onWhatsAppClick = {
-                val msg = WhatsAppTemplates.formatBondWhatsAppMessage(bond, settings)
-                WhatsAppTemplates.sendToWhatsApp(context, bond.customerMobile ?: "", msg)
-            },
-            onPrintClick = { /* TODO: Implement print */ },
-            onShareClick = { /* TODO: Implement share with PDF */ },
             onDeleteClick = {
                 bondToDelete = bond
                 selectedBondForPreview = null
+            },
+            onPrintClick = { /* TODO: Print bond */ },
+            onWhatsAppClick = {
+                val msg = formatBondWhatsAppMessage(bond, settings)
+                WhatsAppUtils.sendTextOnly(context, bond.customerMobile, msg)
             },
             onClose = { selectedBondForPreview = null }
         )
     }
     
-    // DELETE CONFIRMATION DIALOG
+    // MANAGER DELETE CONFIRMATION DIALOG
     bondToDelete?.let { bond ->
-        DeleteConfirmationDialog(
+        DeleteBondDialog(
             bond = bond,
             settings = settings,
-            onConfirm = {
+            onDeleteConfirm = {
                 onDeleteBond?.invoke(bond.id)
                 bondToDelete = null
             },
-            onCancel = { bondToDelete = null }
+            onClose = { bondToDelete = null }
         )
     }
 }
 
 @Composable
-private fun BondItem(
+private fun BondCard(
     bond: Bond,
     settings: SystemSettings,
     isAdmin: Boolean,
-    copiedBondId: String?,
+    context: Context,
+    customers: List<Customer>,
+    onPreviewClick: () -> Unit,
+    onDeleteClick: () -> Unit,
     onCopyClick: () -> Unit,
     onWhatsAppClick: () -> Unit,
-    onPreviewClick: () -> Unit,
-    onPrintClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    isCopied: Boolean
 ) {
-    val isReceipt = bond.type == BondType.RECEIPT
+    val isReceipt = bond.type == "RECEIPT"
     
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -454,10 +449,7 @@ private fun BondItem(
             containerColor = Color.White
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        border = BorderStroke(
-            1.dp,
-            if (isReceipt) Color(0xFFA7F3D0) else Color(0xFFFECACA)
-        )
+        border = BorderStroke(1.dp, if (isReceipt) Color(0xFFA7F3D0) else Color(0xFFFECACA))
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -476,23 +468,18 @@ private fun BondItem(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Surface(
-                            color = if (isReceipt) Color(0xFFD1FAE5) else Color(0xFFFFE4E6),
+                            color = if (isReceipt) Color(0xFFD1FAE5) else Color(0xFFFEE2E2),
                             shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
-                                text = if (isReceipt) "سند قبض نقداً" else "سند صرف",
+                                text = if (isReceipt) "سند قبض نقداً" else "سند صرف" + " #${bond.bondNumber}",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Black,
-                                color = if (isReceipt) Color(0xFF065F46) else Color(0xFF9F1239),
+                                fontFamily = FontFamily.Monospace,
+                                color = if (isReceipt) Color(0xFF065F46) else Color(0xFF991B1B),
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                             )
                         }
-                        Text(
-                            text = "#${bond.bondNumber}",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Black,
-                            color = Color(0xFF1E293B)
-                        )
                         Text(
                             text = bond.customerName,
                             fontSize = 12.sp,
@@ -510,17 +497,17 @@ private fun BondItem(
                     Text(
                         text = "البيان: ${bond.note}",
                         fontSize = 11.sp,
-                        color = Color(0xFF475569),
-                        fontWeight = FontWeight.Medium
+                        color = Color(0xFF475569)
                     )
                 }
                 
                 Column(
-                    horizontalAlignment = Alignment.End
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
                         text = "${String.format("%,.2f", bond.amount)} ${settings.currencySymbol}",
-                        fontSize = 16.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Black,
                         fontFamily = FontFamily.Monospace,
                         color = Color(0xFF1E293B)
@@ -555,6 +542,7 @@ private fun BondItem(
                         Icon(
                             Icons.Default.Visibility,
                             contentDescription = null,
+                            tint = Color(0xFF475569),
                             modifier = Modifier.size(12.dp)
                         )
                         Spacer(Modifier.width(4.dp))
@@ -565,13 +553,14 @@ private fun BondItem(
                         )
                     }
                     
-                    Button(
-                        onClick = onPrintClick,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFCCFBF1)
+                    OutlinedButton(
+                        onClick = { /* TODO: Print */ },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFF0F766E)
                         ),
                         modifier = Modifier.height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp)
+                        contentPadding = PaddingValues(horizontal = 10.dp),
+                        border = BorderStroke(1.dp, Color(0xFF99F6E4))
                     ) {
                         Icon(
                             Icons.Default.Print,
@@ -583,19 +572,19 @@ private fun BondItem(
                         Text(
                             text = "طباعة حرارية",
                             fontSize = 10.sp,
-                            fontWeight = FontWeight.Black,
-                            color = Color(0xFF0F766E)
+                            fontWeight = FontWeight.Black
                         )
                     }
                     
                     if (isAdmin) {
-                        Button(
+                        OutlinedButton(
                             onClick = onDeleteClick,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFFEF2F2)
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = Color(0xFFE11D48)
                             ),
                             modifier = Modifier.height(32.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp)
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                            border = BorderStroke(1.dp, Color(0xFFFECACA))
                         ) {
                             Icon(
                                 Icons.Default.Delete,
@@ -607,15 +596,14 @@ private fun BondItem(
                             Text(
                                 text = "حذف",
                                 fontSize = 10.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Color(0xFFE11D48)
+                                fontWeight = FontWeight.Black
                             )
                         }
                     }
                 }
                 
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Button(
                         onClick = onCopyClick,
@@ -623,13 +611,13 @@ private fun BondItem(
                             containerColor = Color(0xFFF1F5F9)
                         ),
                         modifier = Modifier.height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp)
+                        contentPadding = PaddingValues(horizontal = 8.dp)
                     ) {
-                        if (copiedBondId == bond.id) {
+                        if (isCopied) {
                             Icon(
                                 Icons.Default.Check,
                                 contentDescription = null,
-                                tint = Color(0xFF059669),
+                                tint = Color(0xFF047857),
                                 modifier = Modifier.size(12.dp)
                             )
                             Spacer(Modifier.width(4.dp))
@@ -643,6 +631,7 @@ private fun BondItem(
                             Icon(
                                 Icons.Default.ContentCopy,
                                 contentDescription = null,
+                                tint = Color(0xFF475569),
                                 modifier = Modifier.size(12.dp)
                             )
                             Spacer(Modifier.width(4.dp))
@@ -660,11 +649,12 @@ private fun BondItem(
                             containerColor = Color(0xFF059669)
                         ),
                         modifier = Modifier.height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp)
+                        contentPadding = PaddingValues(horizontal = 8.dp)
                     ) {
                         Icon(
                             Icons.Default.Message,
                             contentDescription = null,
+                            tint = Color.White,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(Modifier.width(4.dp))
@@ -681,10 +671,6 @@ private fun BondItem(
     }
 }
 
-@Composable
-private fun formatDateTime(timestamp: Long): String {
-    val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("ar"))
-    return sdf.format(Date(timestamp))
-}
+// TODO: Add BondModal, CreatedBondDialog, BondPreviewModal, DeleteBondDialog
 
-// TODO: Add remaining modal components (CreateBondModal, WhatsAppSendDialog, BondPreviewModal, DeleteConfirmationDialog)
+private fun formatDateTime(timestamp: Long): String {
