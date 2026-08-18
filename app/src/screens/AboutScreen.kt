@@ -1,4 +1,4 @@
-package com.smartlink.khamernet.ui.screens
+package com.smartlink.erp.screens
 
 import android.content.Context
 import android.widget.Toast
