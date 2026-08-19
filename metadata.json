@@ -1,0 +1,6 @@
+{
+  "name": "تطبيق سمارت لينك المحاسبي",
+  "description": "تطبيق سمارت لينك المحاسبي لنقاط البيع وإدارة المخزون والعملاء والسندات السحابية",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
