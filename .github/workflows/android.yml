@@ -2,53 +2,43 @@ name: Build Android APK
 
 on:
   push:
-    branches:
-      - main # أو master حسب اسم الفرع الرئيسي لديك
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
   build:
+    name: Build & Generate APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Source Code
+      - name: Checkout Code
         uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
           java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
 
-      - name: Install Dependencies
-        run: npm ci
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
-      - name: Build Web Project and Sync Capacitor
-        run: npm run static-build
-
-      - name: Initialize Capacitor Android Platform
+      - name: Ensure Gradle Wrapper Exists
         run: |
-          npx cap add android
-          
-      - name: Adjust Android SDK Versions for Android 9.0+
-        run: |
-          # ضبط الحد الأدنى للتشغيل ليدعم أندرويد 9.0 فما فوق (API 28)
-          sed -i 's/minSdkVersion = .*/minSdkVersion = 28/g' android/variables.gradle
-          # ضبط الإصدار المستهدف للتوافق مع معايير جوجل بلاي لعام 2026 (API 36)
-          sed -i 's/targetSdkVersion = .*/targetSdkVersion = 36/g' android/variables.gradle
+          if [ ! -f ./gradlew ]; then
+            gradle wrapper
+          fi
+          chmod +x ./gradlew
 
-      - name: Build Android APK (Release)
-        run: |
-          cd android
-          ./gradlew assembleRelease
+      - name: Build Debug APK
+        run: ./gradlew :app:assembleDebug --stacktrace
 
-      - name: Upload APK Artifact
+      - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sales-app-release-apk
-          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+          name: SmartLink-POS-Debug-APK
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 14
