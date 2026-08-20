@@ -23,6 +23,7 @@ android {
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
+  // 🔒 إعدادات التوقيع الإلكتروني
   signingConfigs {
     create("release") {
       val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
@@ -42,6 +43,7 @@ android {
     }
   }
 
+  // 🛠️ أنواع البناء
   buildTypes {
     release {
       isCrunchPngs = false
@@ -70,6 +72,7 @@ android {
   }
 }
 
+// 🔑 إعدادات المفاتيح السرية
 secrets {
   propertiesFileName = ".env"
   defaultPropertiesFileName = ".env.example"
