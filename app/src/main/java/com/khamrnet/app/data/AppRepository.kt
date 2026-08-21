@@ -88,9 +88,9 @@ class AppRepository(context: Context) {
         }
     }
 
-    suspend fun login(username: String, userCode: String, password: String): UserEntity? =
+    suspend fun login(userCode: String, password: String): UserEntity? =
         withContext(Dispatchers.IO) {
-            val user = userDao.findByUserAndCode(username.trim(), userCode.trim())
+            val user = userDao.findByCode(userCode.trim())
             if (user != null && user.password == password.trim()) user else null
         }
 
