@@ -237,14 +237,13 @@ private fun LoadingScreen() {
 
 @Composable
 private fun LoginScreen(state: AppUiState, viewModel: AppViewModel) {
-    var username by rememberSaveable { mutableStateOf("") }
     var userCode by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
     val passwordFocusRequester = remember { FocusRequester() }
     val login = {
         focusManager.clearFocus()
-        viewModel.login(username, userCode, password)
+        viewModel.login(userCode, password)
     }
     Box(
         Modifier.fillMaxSize().imePadding().background(
@@ -279,22 +278,6 @@ private fun LoginScreen(state: AppUiState, viewModel: AppViewModel) {
                     Text("نظام المبيعات والمخزون", color = Color(0xFF0F766E))
                     Spacer(Modifier.height(28.dp))
                     OutlinedTextField(
-                        value = username,
-                        onValueChange = { username = it },
-                        label = { Text("اسم المستخدم") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Number,
-                            imeAction = ImeAction.Next
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onNext = { passwordFocusRequester.requestFocus() },
-                            onDone = { passwordFocusRequester.requestFocus() }
-                        )
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
                         value = userCode,
                         onValueChange = { userCode = it.filter(Char::isDigit) },
                         label = { Text("كود المستخدم") },
@@ -308,7 +291,7 @@ private fun LoginScreen(state: AppUiState, viewModel: AppViewModel) {
                             onNext = { passwordFocusRequester.requestFocus() }
                         )
                     )
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(14.dp))
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it.filter(Char::isDigit) },
@@ -322,7 +305,7 @@ private fun LoginScreen(state: AppUiState, viewModel: AppViewModel) {
                         ),
                         keyboardActions = KeyboardActions(
                             onDone = {
-                                if (username.isNotBlank() && userCode.isNotBlank() && password.isNotBlank()) login()
+                                if (userCode.isNotBlank() && password.isNotBlank()) login()
                             }
                         )
                     )
@@ -330,10 +313,10 @@ private fun LoginScreen(state: AppUiState, viewModel: AppViewModel) {
                     Button(
                         onClick = login,
                         modifier = Modifier.fillMaxWidth().height(52.dp),
-                        enabled = username.isNotBlank() && userCode.isNotBlank() && password.isNotBlank()
+                        enabled = userCode.isNotBlank() && password.isNotBlank()
                     ) { Text("دخول") }
                     Spacer(Modifier.height(18.dp))
-                    Text("الحساب الافتراضي: المدير العام / 1 / 1", color = Color.Gray, fontSize = 12.sp)
+                    Text("الدخول الافتراضي للمدير: كود (1001) / كلمة المرور (123)", color = Color.Gray, fontSize = 12.sp)
                     state.error?.let {
                         Spacer(Modifier.height(12.dp))
                         Text(it, color = MaterialTheme.colorScheme.error)
@@ -917,8 +900,7 @@ private fun UsersScreen(state: AppUiState, viewModel: AppViewModel) {
                     Row(Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Column {
                             Text(user.displayName, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                            Text("اسم الدخول: ${user.username}", color = Color.Gray)
-                            Text("كود المستخدم: ${user.userCode}", color = Color.Gray, fontSize = 12.sp)
+                            Text("كود المستخدم: ${user.userCode}", color = Color.Gray, fontSize = 13.sp)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             AssistChip(onClick = {}, label = { Text(if (user.role == "ADMIN") "مدير" else "كاشير") })
@@ -940,16 +922,14 @@ private fun UsersScreen(state: AppUiState, viewModel: AppViewModel) {
 @Composable
 private fun UserEditorDialog(user: UserEntity?, viewModel: AppViewModel, onDismiss: () -> Unit) {
     var name by remember(user?.id) { mutableStateOf(user?.displayName ?: "") }
-    var username by remember(user?.id) { mutableStateOf(user?.username ?: "") }
     var userCode by remember(user?.id) { mutableStateOf(user?.userCode ?: "") }
     var password by remember(user?.id) { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (user == null) "تسجيل كاشير" else "تعديل بيانات المستخدم") },
+        title = { Text(if (user == null) "تسجيل كاشير جديد" else "تعديل بيانات المستخدم") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 FormField("الاسم الظاهر", name) { name = it }
-                FormField("اسم المستخدم", username) { username = it }
                 FormField("كود المستخدم الرقمي", userCode, numeric = true) { userCode = it }
                 OutlinedTextField(
                     password,
@@ -966,13 +946,13 @@ private fun UserEditorDialog(user: UserEntity?, viewModel: AppViewModel, onDismi
             Button(
                 onClick = {
                     if (user == null) {
-                        viewModel.createUser(username, userCode, password, name)
+                        viewModel.createUser(userCode, userCode, password, name)
                     } else {
-                        viewModel.updateUser(user, username, userCode, password, name)
+                        viewModel.updateUser(user, userCode, userCode, password, name)
                     }
                     onDismiss()
                 },
-                enabled = name.isNotBlank() && username.isNotBlank() && userCode.isNotBlank() &&
+                enabled = name.isNotBlank() && userCode.isNotBlank() &&
                     (user != null || password.isNotBlank())
             ) { Text(if (user == null) "إنشاء" else "حفظ التعديلات") }
         },
