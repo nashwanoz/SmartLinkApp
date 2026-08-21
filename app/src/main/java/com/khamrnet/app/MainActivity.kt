@@ -42,21 +42,30 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Inventory
 import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Paid
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PointOfSale
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Warehouse
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -337,12 +346,12 @@ private fun LoginScreen(state: AppUiState, viewModel: AppViewModel) {
 @Composable
 private fun MainShell(state: AppUiState, viewModel: AppViewModel, snackbar: SnackbarHostState) {
     val isAdmin = state.user?.role == "ADMIN"
-    var selected by rememberSaveable { mutableStateOf(if (isAdmin) AppSection.HOME.name else AppSection.POS.name) }
+    var selected by rememberSaveable { mutableStateOf(AppSection.HOME.name) }
     val section = runCatching { AppSection.valueOf(selected) }.getOrDefault(AppSection.HOME)
     val available = if (isAdmin) {
         listOf(AppSection.HOME, AppSection.POS, AppSection.INVOICES, AppSection.REPORTS, AppSection.PRODUCTS, AppSection.USERS, AppSection.TRANSFERS, AppSection.CUSTOMERS, AppSection.BONDS, AppSection.SETTLEMENTS)
     } else {
-        listOf(AppSection.POS, AppSection.CUSTOMERS, AppSection.BONDS, AppSection.REPORTS)
+        listOf(AppSection.HOME, AppSection.POS, AppSection.INVOICES, AppSection.CUSTOMERS, AppSection.BONDS)
     }
     val bottomItems = available.take(5)
     Scaffold(
@@ -350,14 +359,16 @@ private fun MainShell(state: AppUiState, viewModel: AppViewModel, snackbar: Snac
             TopAppBar(
                 title = { Text(section.title, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    Icon(
-                        if (isAdmin) Icons.Default.Settings else Icons.Default.PointOfSale,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                    IconButton(onClick = { selected = AppSection.HOME.name }) {
+                        Icon(
+                            if (section == AppSection.HOME) (if (isAdmin) Icons.Default.Settings else Icons.Default.PointOfSale) else Icons.Default.ArrowBack,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 },
                 actions = {
-                    Text(state.user?.displayName ?: "", color = MaterialTheme.colorScheme.primary)
+                    Text(state.user?.displayName ?: "", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                     IconButton(onClick = viewModel::logout) {
                         Icon(Icons.Default.Logout, contentDescription = "خروج")
                     }
@@ -380,9 +391,14 @@ private fun MainShell(state: AppUiState, viewModel: AppViewModel, snackbar: Snac
         },
         snackbarHost = { SnackbarHost(snackbar) }
     ) { padding ->
-        Surface(Modifier.fillMaxSize().padding(padding), color = MaterialTheme.colorScheme.background) {
+        Surface(Modifier.fillMaxSize().padding(padding), color = Color(0xFFF8FAFC)) {
             when (section) {
-                AppSection.HOME -> DashboardScreen(state) { selected = it.name }
+                AppSection.HOME -> DashboardScreen(
+                    state = state,
+                    viewModel = viewModel,
+                    onNavigate = { selected = it.name },
+                    onOpenPos = { selected = AppSection.POS.name }
+                )
                 AppSection.POS -> PosScreen(state, viewModel)
                 AppSection.INVOICES -> InvoicesScreen(state)
                 AppSection.REPORTS -> ReportsScreen(state)
@@ -397,87 +413,541 @@ private fun MainShell(state: AppUiState, viewModel: AppViewModel, snackbar: Snac
     }
 }
 
+private data class GridNavAction(
+    val title: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val iconColor: Color,
+    val bgColor: Color,
+    val borderColor: Color,
+    val badge: String? = null,
+    val onClick: () -> Unit
+)
+
 @Composable
-private fun DashboardScreen(state: AppUiState, onNavigate: (AppSection) -> Unit) {
-    val stats = state.stats
-    val isAdmin = state.user?.role == "ADMIN"
-    val actions = if (isAdmin) {
-        listOf(
-            AppSection.POS,
-            AppSection.INVOICES,
-            AppSection.REPORTS,
-            AppSection.PRODUCTS,
-            AppSection.USERS,
-            AppSection.TRANSFERS,
-            AppSection.CUSTOMERS,
-            AppSection.BONDS,
-            AppSection.SETTLEMENTS
-        )
+private fun DashboardScreen(
+    state: AppUiState,
+    viewModel: AppViewModel,
+    onNavigate: (AppSection) -> Unit,
+    onOpenPos: () -> Unit
+) {
+    val context = LocalContext.current
+    val currentUser = state.user
+    val isCashier = currentUser?.role == "CASHIER"
+    val currencySymbol = "ر.ي"
+
+    var showAboutDialog by remember { mutableStateOf(false) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
+
+    val displayedInvoices = if (isCashier) {
+        state.invoices.filter { it.userId == currentUser?.id }
     } else {
-        listOf(AppSection.POS, AppSection.INVOICES, AppSection.REPORTS, AppSection.CUSTOMERS, AppSection.BONDS)
+        state.invoices
     }
+
+    val displayedBonds = if (isCashier) {
+        state.bonds.filter { it.userId == currentUser?.id }
+    } else {
+        state.bonds
+    }
+
+    val totalSales = displayedInvoices.sumOf { it.total }
+    val totalCashSales = displayedInvoices.sumOf { it.paidAmount }
+    val totalBondsReceipts = displayedBonds.filter { it.type == "RECEIPT" }.sumOf { it.amount }
+    val totalPaymentBonds = displayedBonds.filter { it.type == "PAYMENT" }.sumOf { it.amount }
+    val totalCashCollected = totalCashSales + totalBondsReceipts
+
+    val cashierSettledAmount = 0.0
+    val cashierDrawerBalance = (totalCashSales + totalBondsReceipts - totalPaymentBonds) - cashierSettledAmount
+    val managerTreasuryBalance = state.cashBoxes.firstOrNull { it.ownerUserId == null }?.balance 
+        ?: (totalCashSales + totalBondsReceipts - totalPaymentBonds)
+
+    val cashiersRemainingDueTotal = state.cashBoxes.filter { it.ownerUserId != null }.sumOf { it.balance }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(18.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        contentPadding = PaddingValues(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // 1. Quick POS Launch Button
         item {
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF102A43)),
-                shape = RoundedCornerShape(22.dp),
-                modifier = Modifier.fillMaxWidth()
+                onClick = onOpenPos,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F766E)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
             ) {
-                Column(Modifier.padding(22.dp)) {
-                    Text("أهلًا بك في خمر نت", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(5.dp))
-                    Text("كل عملياتك محفوظة محليًا وتستمر حتى دون اتصال.", color = Color.White.copy(alpha = .8f))
+                Row(
+                    modifier = Modifier.padding(14.dp).fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                        }
+                        Column {
+                            Text(
+                                "فتح نقطة البيع (POS)",
+                                fontWeight = FontWeight.Black,
+                                fontSize = 14.sp,
+                                color = Color.White
+                            )
+                            Text(
+                                "إصدار فاتورة نقدية أو آجلة وسداد جزئي",
+                                fontSize = 11.sp,
+                                color = Color(0xFFCCFBF1)
+                            )
+                        }
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color.White,
+                        shadowElevation = 1.dp
+                    ) {
+                        Text(
+                            "دخول البيع ⚡",
+                            color = Color(0xFF0F766E),
+                            fontWeight = FontWeight.Black,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
                 }
             }
         }
+
+        // 2. Stats Overview - 3 items in a row
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatCard("مبيعات اليوم", "%.2f".format(stats.todaySales), Color(0xFF0F766E), Modifier.weight(1f))
-                StatCard("العهدة / العجز", "%.2f".format(stats.carriedDifference), Color(0xFFD99A2B), Modifier.weight(1f))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Card 1: Total Sales
+                HomeScreenStatCard(
+                    title = if (isCashier) "مبيعاتك" else "إجمالي المبيعات",
+                    value = "%,.0f".format(totalSales),
+                    currency = currencySymbol,
+                    subtitle = "${displayedInvoices.size} فواتير",
+                    icon = Icons.Default.TrendingUp,
+                    iconColor = Color(0xFF0F766E),
+                    modifier = Modifier.weight(1f)
+                )
+
+                // Card 2: Total Cash Collected
+                HomeScreenStatCard(
+                    title = if (isCashier) "المقبوض كاش" else "المقبوضات",
+                    value = "%,.0f".format(totalCashCollected),
+                    currency = currencySymbol,
+                    subtitle = "فواتير + سندات",
+                    icon = Icons.Default.CreditCard,
+                    iconColor = Color(0xFF059669),
+                    valueColor = Color(0xFF047857),
+                    modifier = Modifier.weight(1f)
+                )
+
+                // Card 3: Drawer / Treasury Balance
+                HomeScreenStatCard(
+                    title = if (isCashier) "رصيد صندوقك" else "خزينة الإدارة",
+                    value = "%,.0f".format(if (isCashier) cashierDrawerBalance else managerTreasuryBalance),
+                    currency = currencySymbol,
+                    subtitle = if (isCashier) "المتبقي بالدرج" else "الخزينة الرئيسية",
+                    icon = Icons.Default.AccountBalanceWallet,
+                    iconColor = Color(0xFF059669),
+                    valueColor = Color(0xFF047857),
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
-        item {
-            Text("الوصول السريع", fontSize = 19.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(10.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                actions.chunked(2).forEach { rowItems ->
+
+        // 3. Admin Treasury & Cashiers Due Quick Bar
+        if (!isCashier && cashiersRemainingDueTotal > 0) {
+            item {
+                Card(
+                    onClick = { onNavigate(AppSection.SETTLEMENTS) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A))
+                ) {
                     Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp).fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .background(Color(0xFFFBBF24), RoundedCornerShape(4.dp))
+                            )
+                            Text("متبقي في عهد الكواشير للمطالبة:", color = Color(0xFFCBD5E1), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                            Text(
+                                "%,.0f $currencySymbol".format(cashiersRemainingDueTotal),
+                                color = Color(0xFFFDE68A),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Color.White.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                "تصفية وقبض ⚡",
+                                color = Color(0xFF99F6E4),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. Section Heading
+        item {
+            Text(
+                "شاشات وأقسام النظام المتاحة لك",
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 12.sp,
+                color = Color(0xFF475569),
+                modifier = Modifier.padding(horizontal = 2.dp)
+            )
+        }
+
+        // 5. Main Navigation Grid (3 columns per row)
+        item {
+            val navItems = mutableListOf<GridNavAction>()
+
+            // Products
+            navItems.add(
+                GridNavAction(
+                    title = "بيانات الاصناف",
+                    icon = Icons.Default.Inventory,
+                    iconColor = Color(0xFF0F766E),
+                    bgColor = Color(0xFFCCFBF1),
+                    borderColor = Color(0xFF99F6E4),
+                    onClick = { onNavigate(AppSection.PRODUCTS) }
+                )
+            )
+
+            // Customers
+            navItems.add(
+                GridNavAction(
+                    title = "العملاء",
+                    icon = Icons.Default.People,
+                    iconColor = Color(0xFF1D4ED8),
+                    bgColor = Color(0xFFDBEAFE),
+                    borderColor = Color(0xFFBFDBFE),
+                    onClick = { onNavigate(AppSection.CUSTOMERS) }
+                )
+            )
+
+            // Invoices
+            navItems.add(
+                GridNavAction(
+                    title = "سجل الفواتير",
+                    icon = Icons.Default.ReceiptLong,
+                    iconColor = Color(0xFF7E22CE),
+                    bgColor = Color(0xFFF3E8FF),
+                    borderColor = Color(0xFFE9D5FF),
+                    onClick = { onNavigate(AppSection.INVOICES) }
+                )
+            )
+
+            // Bonds
+            navItems.add(
+                GridNavAction(
+                    title = "السندات",
+                    icon = Icons.Default.Description,
+                    iconColor = Color(0xFF047857),
+                    bgColor = Color(0xFFD1FAE5),
+                    borderColor = Color(0xFFA7F3D0),
+                    onClick = { onNavigate(AppSection.BONDS) }
+                )
+            )
+
+            // Stock Transfers (for Admin)
+            if (!isCashier) {
+                navItems.add(
+                    GridNavAction(
+                        title = "التحويل المخزني",
+                        icon = Icons.Default.SwapHoriz,
+                        iconColor = Color(0xFFC2410C),
+                        bgColor = Color(0xFFFFEDD5),
+                        borderColor = Color(0xFFFED7AA),
+                        onClick = { onNavigate(AppSection.TRANSFERS) }
+                    )
+                )
+            }
+
+            // Cashier Settlements
+            navItems.add(
+                GridNavAction(
+                    title = "تصفية الكاشير",
+                    icon = Icons.Default.AccountBalance,
+                    iconColor = Color(0xFF047857),
+                    bgColor = Color(0xFFD1FAE5),
+                    borderColor = Color(0xFFA7F3D0),
+                    onClick = { onNavigate(AppSection.SETTLEMENTS) }
+                )
+            )
+
+            // Expenses
+            navItems.add(
+                GridNavAction(
+                    title = "المصاريف",
+                    icon = Icons.Default.Paid,
+                    iconColor = Color(0xFFBE123C),
+                    bgColor = Color(0xFFFFE4E6),
+                    borderColor = Color(0xFFFECDD3),
+                    onClick = { onNavigate(AppSection.BONDS) }
+                )
+            )
+
+            // Card Generation (Coming soon)
+            navItems.add(
+                GridNavAction(
+                    title = "توليد الكروت",
+                    icon = Icons.Default.Wifi,
+                    iconColor = Color(0xFF0369A1),
+                    bgColor = Color(0xFFE0F2FE),
+                    borderColor = Color(0xFFBAE6FD),
+                    badge = "قريباً",
+                    onClick = { Toast.makeText(context, "ميزة توليد كروت الشبكة قريباً!", Toast.LENGTH_SHORT).show() }
+                )
+            )
+
+            // Users / Cashiers (Admin)
+            if (!isCashier) {
+                navItems.add(
+                    GridNavAction(
+                        title = "الكاشير",
+                        icon = Icons.Default.People,
+                        iconColor = Color(0xFF4338CA),
+                        bgColor = Color(0xFFE0E7FF),
+                        borderColor = Color(0xFFC7D2FE),
+                        onClick = { onNavigate(AppSection.USERS) }
+                    )
+                )
+            }
+
+            // Accounting Ledger / Reports
+            navItems.add(
+                GridNavAction(
+                    title = "القيود المحاسبية",
+                    icon = Icons.Default.MenuBook,
+                    iconColor = Color(0xFF0F766E),
+                    bgColor = Color(0xFFCCFBF1),
+                    borderColor = Color(0xFF99F6E4),
+                    onClick = { onNavigate(AppSection.REPORTS) }
+                )
+            )
+
+            // System Settings
+            navItems.add(
+                GridNavAction(
+                    title = "إعدادات النظام",
+                    icon = Icons.Default.Settings,
+                    iconColor = Color(0xFF334155),
+                    bgColor = Color(0xFFF1F5F9),
+                    borderColor = Color(0xFFE2E8F0),
+                    onClick = { showSettingsDialog = true }
+                )
+            )
+
+            // About Program
+            navItems.add(
+                GridNavAction(
+                    title = "حول البرنامج",
+                    icon = Icons.Default.Info,
+                    iconColor = Color(0xFF0F766E),
+                    bgColor = Color(0xFFCCFBF1),
+                    borderColor = Color(0xFF99F6E4),
+                    onClick = { showAboutDialog = true }
+                )
+            )
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                navItems.chunked(3).forEach { rowItems ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         rowItems.forEach { item ->
-                            DashboardActionCard(item, Modifier.weight(1f)) { onNavigate(item) }
+                            HomeGridButton(item, Modifier.weight(1f))
                         }
-                        if (rowItems.size == 1) Spacer(Modifier.weight(1f))
+                        repeat(3 - rowItems.size) {
+                            Spacer(Modifier.weight(1f))
+                        }
                     }
                 }
             }
         }
     }
+
+    if (showAboutDialog) {
+        AlertDialog(
+            onDismissRequest = { showAboutDialog = false },
+            icon = { Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFF0F766E), modifier = Modifier.size(32.dp)) },
+            title = { Text("حول خمر نت POS", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("نظام إدارة المبيعات ونقاط البيع المتكامل", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Text("الإصدار: 2.5.0", color = Color.Gray, fontSize = 12.sp)
+                    Text("Smart Link 2026 - جميع الحقوق محفوظة", color = Color.Gray, fontSize = 12.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAboutDialog = false }) { Text("إغلاق") }
+            }
+        )
+    }
+
+    if (showSettingsDialog) {
+        AlertDialog(
+            onDismissRequest = { showSettingsDialog = false },
+            icon = { Icon(Icons.Default.Settings, contentDescription = null, tint = Color(0xFF334155), modifier = Modifier.size(32.dp)) },
+            title = { Text("إعدادات النظام", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("العملة المعتمدة: ريال يمني (ر.ي)", fontSize = 13.sp)
+                    Text("نوع الشبكة: محلية وسحابية متصلة", fontSize = 13.sp)
+                    Text("الطابعة الافتراضية: طابعة بلوتوث حرارية 58mm/80mm", fontSize = 13.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSettingsDialog = false }) { Text("تم") }
+            }
+        )
+    }
 }
 
 @Composable
-private fun DashboardActionCard(
-    section: AppSection,
+private fun HomeScreenStatCard(
+    title: String,
+    value: String,
+    currency: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconColor: Color,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit
+    valueColor: Color = Color(0xFF1E293B)
 ) {
     Card(
-        modifier = modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(
-            Modifier.fillMaxWidth().padding(vertical = 20.dp, horizontal = 10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.padding(8.dp).fillMaxWidth(),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Icon(section.icon, contentDescription = section.title, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(34.dp))
-            Spacer(Modifier.height(8.dp))
-            Text(section.title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    title,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF64748B),
+                    maxLines = 1
+                )
+                Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(14.dp))
+            }
+            Spacer(Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    value,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Black,
+                    color = valueColor,
+                    maxLines = 1
+                )
+                Spacer(Modifier.width(2.dp))
+                Text(currency, fontSize = 8.sp, color = Color(0xFF64748B))
+            }
+            Spacer(Modifier.height(2.dp))
+            Text(
+                subtitle,
+                fontSize = 9.sp,
+                color = Color(0xFF94A3B8),
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeGridButton(
+    action: GridNavAction,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        onClick = action.onClick,
+        modifier = modifier.height(76.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (action.badge != null) {
+                Surface(
+                    shape = RoundedCornerShape(full = 100),
+                    color = Color(0xFFF59E0B),
+                    modifier = Modifier.align(Alignment.TopStart).padding(4.dp)
+                ) {
+                    Text(
+                        action.badge,
+                        color = Color.White,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Black,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp, vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .background(action.bgColor, RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        action.icon,
+                        contentDescription = action.title,
+                        tint = action.iconColor,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    action.title,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 10.sp,
+                    color = Color(0xFF1E293B),
+                    maxLines = 1
+                )
+            }
         }
     }
 }
