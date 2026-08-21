@@ -33,6 +33,10 @@ jobs:
           fi
           chmod +x ./gradlew
 
+      # 🔐 هذه هي الخطوة الجديدة التي ستقرأ الـ Secret وتنشئ الملف في المسار الصحيح قبل البناء
+      - name: Create Google Services JSON
+        run: echo '${{ secrets.FIREBASE_SECRET }}' > app/google-services.json
+
       - name: Build Debug APK
         env:
           JAVA_TOOL_OPTIONS: "-Djava.awt.headless=true"
