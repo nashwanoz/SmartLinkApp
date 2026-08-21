@@ -12,6 +12,9 @@ interface UserDao {
     @Query("SELECT * FROM users")
     fun getAll(): Flow<List<UserEntity>>
 
+    @Query("SELECT * FROM users WHERE userCode = :userCode LIMIT 1")
+    suspend fun findByCode(userCode: String): UserEntity?
+
     @Query("SELECT * FROM users WHERE username = :username AND userCode = :userCode LIMIT 1")
     suspend fun findByUserAndCode(username: String, userCode: String): UserEntity?
 
