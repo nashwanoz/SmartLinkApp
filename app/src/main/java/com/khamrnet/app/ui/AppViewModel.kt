@@ -30,9 +30,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun login(username: String, userCode: String, password: String) {
+    fun login(userCode: String, password: String) {
         viewModelScope.launch {
-            val user = repository.login(username, userCode, password)
+            val user = repository.login(userCode, password)
             if (user != null) {
                 _state.update { it.copy(user = user, error = null) }
                 startObserving(user)
