@@ -79,6 +79,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             launch {
+                repository.observeBonds().collectLatest { bonds ->
+                    _state.update { it.copy(bonds = bonds) }
+                }
+            }
+            launch {
                 if (user.role == "ADMIN") {
                     repository.observeAllInvoices().collectLatest { invoices ->
                         _state.update { it.copy(invoices = invoices) }
