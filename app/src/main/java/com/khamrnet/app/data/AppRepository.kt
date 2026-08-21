@@ -106,6 +106,8 @@ class AppRepository(context: Context) {
 
     fun observeCashBoxes(): Flow<List<CashBoxEntity>> = cashBoxDao.getAll()
 
+    fun observeBonds(): Flow<List<FinancialBondEntity>> = bondDao.getAll()
+
     fun stockForMain(): Flow<List<StockBalanceEntity>> = stockDao.getMainStock()
 
     fun stockForUser(userId: Long): Flow<List<StockBalanceEntity>> = stockDao.getUserStock(userId)
