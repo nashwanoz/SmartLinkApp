@@ -90,4 +90,9 @@ class AppRepository(
     val systemSettings: Flow<SystemSettingsEntity?> = systemSettingsDao.getSettingsFlow()
     suspend fun getSettings() = systemSettingsDao.getSettings()
     suspend fun updateSettings(settings: SystemSettingsEntity) = systemSettingsDao.insertOrUpdate(settings)
+
+    suspend fun clearAllData() {
+        invoiceDao.deleteAllInvoices()
+        bondDao.deleteAllBonds()
+    }
 }

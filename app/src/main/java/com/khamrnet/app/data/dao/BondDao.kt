@@ -29,4 +29,7 @@ interface BondDao {
 
     @Delete
     suspend fun deleteBond(bond: BondEntity)
+
+    @Query("DELETE FROM bonds")
+    suspend fun deleteAllBonds()
 }

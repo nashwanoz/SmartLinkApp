@@ -35,6 +35,7 @@ import com.khamrnet.app.data.model.SystemSettingsEntity
 import com.khamrnet.app.sync.SyncState
 import com.khamrnet.app.sync.SyncStatus
 import com.khamrnet.app.ui.KhamrColors
+import com.khamrnet.app.ui.components.StoreActivationDialog
 import java.text.DecimalFormat
 
 data class AppMenuItem(
@@ -59,10 +60,12 @@ fun MainHomeScreen(
     customers: List<CustomerEntity> = emptyList(),
     syncStatus: SyncStatus,
     onTriggerSync: () -> Unit,
+    onUpdateStoreCode: (String) -> Unit = {},
     onNavigate: (screenRoute: String) -> Unit,
     onLogout: () -> Unit
 ) {
     val df = remember { DecimalFormat("#,##0") }
+    var showStoreActivationModal by remember { mutableStateOf(false) }
 
     // Computations matching web HomeScreen.tsx
     val totalSales = remember(invoices) {
@@ -314,17 +317,33 @@ fun MainHomeScreen(
 
                 // Cloud Sync Status Strip (Exact matching Web & Screenshot)
                 val isSyncing = syncStatus.state == SyncState.SYNCING
-                val isConnected = settings.storeCode.isNotEmpty() && syncStatus.state != SyncState.OFFLINE
+                val isSuccess = syncStatus.state == SyncState.SUCCESS && settings.storeCode.isNotEmpty()
                 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(if (isConnected) Color(0xFFECFDF5) else Color(0xFFFFFBEB))
+                        .background(
+                            when {
+                                isSyncing -> Color(0xFFEFF6FF)
+                                isSuccess -> Color(0xFFECFDF5)
+                                else -> Color(0xFFFFFBEB)
+                            }
+                        )
                         .border(
                             width = 0.6.dp,
-                            color = if (isConnected) Color(0xFFA7F3D0) else Color(0xFFFDE68A)
+                            color = when {
+                                isSyncing -> Color(0xFFBFDBFE)
+                                isSuccess -> Color(0xFFA7F3D0)
+                                else -> Color(0xFFFDE68A)
+                            }
                         )
-                        .clickable { onTriggerSync() }
+                        .clickable {
+                            if (isSuccess) {
+                                onTriggerSync()
+                            } else {
+                                showStoreActivationModal = true
+                            }
+                        }
                         .padding(horizontal = 12.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -336,31 +355,55 @@ fun MainHomeScreen(
                         Box(
                             modifier = Modifier
                                 .size(8.dp)
-                                .scale(if (isConnected) pulseScale else 1f)
+                                .scale(if (isSuccess || isSyncing) pulseScale else 1f)
                                 .clip(CircleShape)
-                                .background(if (isConnected) Color(0xFF10B981) else Color(0xFFF59E0B))
+                                .background(
+                                    when {
+                                        isSyncing -> Color(0xFF2563EB)
+                                        isSuccess -> Color(0xFF10B981)
+                                        else -> Color(0xFFF59E0B)
+                                    }
+                                )
                         )
                         Text(
-                            text = if (isSyncing) "جاري المزامنة السحابية..."
-                            else if (isConnected) "المزامنة السحابية متصلة [${settings.storeCode}]"
-                            else "حالة المزامنة السحابية غير مفعلة",
+                            text = when {
+                                isSyncing -> "جاري المزامنة السحابية..."
+                                isSuccess -> "المزامنة السحابية متصلة [${settings.storeCode}]"
+                                settings.storeCode.isNotEmpty() -> "حالة المزامنة السحابية غير متصلة [${settings.storeCode}]"
+                                else -> "حالة المزامنة السحابية غير مفعلة"
+                            },
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (isConnected) Color(0xFF065F46) else Color(0xFF92400E)
+                            color = when {
+                                isSyncing -> Color(0xFF1E40AF)
+                                isSuccess -> Color(0xFF065F46)
+                                else -> Color(0xFF92400E)
+                            }
                         )
                     }
 
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
-                            .background(if (isConnected) Color(0xFFA7F3D0).copy(alpha = 0.7f) else Color(0xFFFDE68A).copy(alpha = 0.7f))
+                            .background(
+                                when {
+                                    isSyncing -> Color(0xFFBFDBFE).copy(alpha = 0.7f)
+                                    isSuccess -> Color(0xFFA7F3D0).copy(alpha = 0.7f)
+                                    else -> Color(0xFFFDE68A).copy(alpha = 0.7f)
+                                }
+                            )
+                            .clickable { showStoreActivationModal = true }
                             .padding(horizontal = 6.dp, vertical = 1.dp)
                     ) {
                         Text(
-                            text = if (isConnected) "إدارة الربط ❮" else "تفعيل الترخيص ❮",
+                            text = if (isSuccess) "إدارة الربط ❮" else "تفعيل الترخيص ❮",
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (isConnected) Color(0xFF065F46) else Color(0xFF92400E)
+                            color = when {
+                                isSyncing -> Color(0xFF1E40AF)
+                                isSuccess -> Color(0xFF065F46)
+                                else -> Color(0xFF92400E)
+                            }
                         )
                     }
                 }
@@ -642,6 +685,18 @@ fun MainHomeScreen(
             }
         }
     }
+
+    // Modal Store Activation & Tenant Space Link
+    StoreActivationDialog(
+        currentStoreCode = settings.storeCode,
+        businessName = settings.businessName,
+        isOpen = showStoreActivationModal,
+        onDismiss = { showStoreActivationModal = false },
+        onConfirmActivation = { newCode ->
+            showStoreActivationModal = false
+            onUpdateStoreCode(newCode)
+        }
+    )
 }
 
 @Composable

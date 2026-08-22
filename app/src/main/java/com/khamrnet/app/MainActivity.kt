@@ -52,8 +52,8 @@ class MainActivity : ComponentActivity() {
                         val allBonds by repository.allBonds.collectAsState(initial = emptyList())
 
                         // Auto sync on start or resume safely
-                        LaunchedEffect(isLoggedIn) {
-                            if (isLoggedIn) {
+                        LaunchedEffect(isLoggedIn, settings.storeCode) {
+                            if (isLoggedIn && settings.storeCode.isNotEmpty()) {
                                 try {
                                     syncManager.performSync(settings.storeCode)
                                 } catch (_: Exception) {}
@@ -87,6 +87,18 @@ class MainActivity : ComponentActivity() {
                                                         Toast.makeText(this@MainActivity, "✅ تمت المزامنة بنجاح", Toast.LENGTH_SHORT).show()
                                                     } else {
                                                         Toast.makeText(this@MainActivity, res.exceptionOrNull()?.message ?: "تنبيه المزامنة", Toast.LENGTH_LONG).show()
+                                                    }
+                                                }
+                                            },
+                                            onUpdateStoreCode = { newCode ->
+                                                coroutineScope.launch {
+                                                    val updated = settings.copy(storeCode = newCode)
+                                                    repository.updateSettings(updated)
+                                                    val res = syncManager.registerOrConnectStore(newCode, settings.businessName)
+                                                    if (res.isSuccess) {
+                                                        Toast.makeText(this@MainActivity, "✅ تم ربط كود المحل $newCode ومزامنة البيانات بنجاح", Toast.LENGTH_SHORT).show()
+                                                    } else {
+                                                        Toast.makeText(this@MainActivity, res.exceptionOrNull()?.message ?: "تنبيه الربط", Toast.LENGTH_LONG).show()
                                                     }
                                                 }
                                             },
@@ -256,8 +268,32 @@ class MainActivity : ComponentActivity() {
                                             bonds = allBonds,
                                             customers = allCustomers,
                                             currentUserName = currentUserName,
+                                            syncStatus = syncStatus,
+                                            onTriggerSync = {
+                                                coroutineScope.launch {
+                                                    val res = syncManager.performSync(settings.storeCode)
+                                                    if (res.isSuccess) {
+                                                        Toast.makeText(this@MainActivity, "✅ تمت المزامنة السحابية بنجاح", Toast.LENGTH_SHORT).show()
+                                                    } else {
+                                                        Toast.makeText(this@MainActivity, res.exceptionOrNull()?.message ?: "خطأ في المزامنة", Toast.LENGTH_LONG).show()
+                                                    }
+                                                }
+                                            },
+                                            onUpdateStoreCode = { newCode ->
+                                                coroutineScope.launch(Dispatchers.IO) {
+                                                    val updated = settings.copy(storeCode = newCode)
+                                                    repository.updateSettings(updated)
+                                                    syncManager.performSync(newCode)
+                                                }
+                                            },
+                                            onNavigate = { route ->
+                                                currentScreen = route
+                                            },
                                             onNavigateBack = {
                                                 currentScreen = "home"
+                                            },
+                                            onLogout = {
+                                                currentScreen = "login"
                                             }
                                         )
                                     }
@@ -283,24 +319,51 @@ class MainActivity : ComponentActivity() {
                                     "settings" -> {
                                         SettingsScreen(
                                             settings = settings,
+                                            currentUserName = currentUserName,
+                                            syncStatus = syncStatus,
+                                            products = allProducts,
+                                            customers = allCustomers,
+                                            invoices = allInvoices,
+                                            bonds = allBonds,
                                             onSaveSettings = { updatedSettings ->
                                                 coroutineScope.launch(Dispatchers.IO) {
                                                     repository.updateSettings(updatedSettings)
                                                     syncManager.performSync(updatedSettings.storeCode)
                                                 }
                                             },
-                                            onManualSync = { targetStoreCode ->
+                                            onTriggerSync = {
                                                 coroutineScope.launch {
-                                                    val res = syncManager.performSync(targetStoreCode)
+                                                    val res = syncManager.performSync(settings.storeCode)
                                                     if (res.isSuccess) {
-                                                        Toast.makeText(this@MainActivity, "✅ تمت المزامنة بنجاح لكود المحل $targetStoreCode", Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(this@MainActivity, "✅ تمت المزامنة السحابية بنجاح", Toast.LENGTH_SHORT).show()
                                                     } else {
-                                                        Toast.makeText(this@MainActivity, res.exceptionOrNull()?.message ?: "خطأ", Toast.LENGTH_LONG).show()
+                                                        Toast.makeText(this@MainActivity, res.exceptionOrNull()?.message ?: "خطأ في المزامنة", Toast.LENGTH_LONG).show()
                                                     }
                                                 }
                                             },
-                                            onNavigateBack = {
-                                                currentScreen = "home"
+                                            onUpdateStoreCode = { newCode ->
+                                                coroutineScope.launch(Dispatchers.IO) {
+                                                    val updated = settings.copy(storeCode = newCode)
+                                                    repository.updateSettings(updated)
+                                                    syncManager.performSync(newCode)
+                                                }
+                                            },
+                                            onResetToDefaults = {
+                                                coroutineScope.launch(Dispatchers.IO) {
+                                                    val defaultSettings = SystemSettingsEntity()
+                                                    repository.updateSettings(defaultSettings)
+                                                }
+                                            },
+                                            onClearAllData = {
+                                                coroutineScope.launch(Dispatchers.IO) {
+                                                    repository.clearAllData()
+                                                }
+                                            },
+                                            onNavigate = { route ->
+                                                currentScreen = route
+                                            },
+                                            onLogout = {
+                                                currentScreen = "login"
                                             }
                                         )
                                     }

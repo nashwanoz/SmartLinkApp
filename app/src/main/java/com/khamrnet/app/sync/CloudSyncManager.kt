@@ -37,12 +37,28 @@ data class SyncStatus(
     val message: String = "جاهز للمزامنة"
 )
 
+data class StoreTenantMetadata(
+    val storeCode: String,
+    val storeName: String,
+    val isActive: Boolean,
+    val maxCashiers: Int = 5,
+    val suspendedMessage: String = ""
+)
+
 class CloudSyncManager(
     private val context: Context,
     private val database: AppDatabase
 ) {
     private val _syncStatus = MutableStateFlow(SyncStatus())
     val syncStatus: StateFlow<SyncStatus> = _syncStatus.asStateFlow()
+
+    companion object {
+        // Firebase Cloud Firestore API Key matching Web App (src/lib/firebase.ts)
+        const val FIREBASE_API_KEY = "AIzaSyD2o46w9HMk6aIU0HcoaaCdzgu3QCWE03g"
+        
+        // Primary Firebase Project ID matching Web App
+        const val PRIMARY_PROJECT_ID = "smart-erp-link"
+    }
 
     // Firestore REST API endpoints for direct cloud synchronization
     private val baseUrls = listOf(
@@ -64,6 +80,77 @@ class CloudSyncManager(
         }
     }
 
+    /**
+     * Registers or connects store code in Cloud Firestore (Matching registerOrConnectStore in Web multiTenantStore.ts)
+     */
+    suspend fun registerOrConnectStore(
+        rawCode: String,
+        businessName: String
+    ): Result<StoreTenantMetadata> = withContext(Dispatchers.IO) {
+        val cleanStoreCode = rawCode.trim().uppercase()
+        if (cleanStoreCode.length < 3) {
+            return@withContext Result.failure(Exception("يرجى إدخال كود توجيه صحيح يتكون من 3 أحرف على الأقل"))
+        }
+
+        if (!isNetworkAvailable()) {
+            return@withContext Result.failure(Exception("لا يوجد اتصال بالإنترنت. يرجى التحقق من الشبكة والمحاولة مجدداً."))
+        }
+
+        try {
+            // Check existing store doc
+            val storeDoc = fetchDocumentFromFirestore("stores/$cleanStoreCode")
+            val metadata: StoreTenantMetadata
+            if (storeDoc != null) {
+                val isActive = getBoolean(storeDoc, "isActive", true)
+                val suspendedMsg = getString(storeDoc, "suspendedMessage", "")
+                val name = getString(storeDoc, "storeName", businessName.ifEmpty { "محل $cleanStoreCode" })
+                val maxCashiers = getLong(storeDoc, "maxCashiers", 5L).toInt()
+                
+                metadata = StoreTenantMetadata(
+                    storeCode = cleanStoreCode,
+                    storeName = name,
+                    isActive = isActive,
+                    maxCashiers = maxCashiers,
+                    suspendedMessage = suspendedMsg
+                )
+
+                if (!isActive) {
+                    return@withContext Result.failure(
+                        Exception(if (suspendedMsg.isNotEmpty()) suspendedMsg else "تم تجميد اشتراك هذا المحل مؤقتاً، يرجى التواصل مع إدارة النظام.")
+                    )
+                }
+            } else {
+                // Auto-create new tenant store document in Firestore
+                val newMeta = mapOf(
+                    "storeCode" to cleanStoreCode,
+                    "storeName" to businessName.ifEmpty { "محل $cleanStoreCode" },
+                    "isActive" to true,
+                    "maxCashiers" to 5,
+                    "createdAt" to System.currentTimeMillis()
+                )
+                uploadDocToFirestore("stores", cleanStoreCode, newMeta)
+
+                metadata = StoreTenantMetadata(
+                    storeCode = cleanStoreCode,
+                    storeName = businessName.ifEmpty { "محل $cleanStoreCode" },
+                    isActive = true,
+                    maxCashiers = 5
+                )
+            }
+
+            // Perform full immediate sync
+            performSync(cleanStoreCode)
+
+            Result.success(metadata)
+        } catch (e: Exception) {
+            Log.e("CloudSyncManager", "Store connect error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Performs full bi-directional sync (PULL cloud changes & PUSH local changes)
+     */
     suspend fun performSync(storeCode: String): Result<String> = withContext(Dispatchers.IO) {
         val cleanStoreCode = storeCode.trim().uppercase().ifEmpty { "KHAMR01" }
 
@@ -91,6 +178,7 @@ class CloudSyncManager(
             val settingsDao = database.systemSettingsDao()
 
             var totalPulledItems = 0
+            var totalPushedItems = 0
 
             // -------------------------------------------------------------
             // 1. PULL / DOWNLOAD FROM FIRESTORE TO LOCAL ROOM DATABASE
@@ -101,18 +189,24 @@ class CloudSyncManager(
             if (remoteProducts.isNotEmpty()) {
                 val parsedProducts = remoteProducts.map { (docId, fields) ->
                     val id = getString(fields, "id", docId)
+                    val price = getDouble(fields, "price", getDouble(fields, "salePrice", 0.0))
+                    val purchasePrice = getDouble(fields, "purchasePrice", getDouble(fields, "costPrice", 0.0))
+                    val casePrice = getDouble(fields, "casePrice", getDouble(fields, "wholesalePrice", 0.0))
+                    val stock = getDouble(fields, "stockMain", getDouble(fields, "stockQuantity", 0.0))
+                    val unit = getString(fields, "unitName", getString(fields, "baseUnitName", "حبة"))
+
                     ProductEntity(
                         id = id,
-                        code = getString(fields, "code", getString(fields, "barcode", id)),
+                        code = getString(fields, "barcode", getString(fields, "code", id)),
                         name = getString(fields, "name", getString(fields, "productName", "صنف")),
                         barcode = getString(fields, "barcode", ""),
                         category = getString(fields, "category", "عام"),
-                        purchasePrice = getDouble(fields, "purchasePrice", getDouble(fields, "costPrice", 0.0)),
-                        salePrice = getDouble(fields, "salePrice", getDouble(fields, "price", 0.0)),
-                        wholesalePrice = getDouble(fields, "wholesalePrice", getDouble(fields, "casePrice", 0.0)),
-                        stockQuantity = getDouble(fields, "stockQuantity", getDouble(fields, "stockMain", 0.0)),
+                        purchasePrice = purchasePrice,
+                        salePrice = price,
+                        wholesalePrice = casePrice,
+                        stockQuantity = stock,
                         minStockLimit = getDouble(fields, "minStockLimit", 5.0),
-                        baseUnitName = getString(fields, "baseUnitName", getString(fields, "unitName", "حبة")),
+                        baseUnitName = unit,
                         unitsJson = getString(fields, "unitsJson", getString(fields, "subUnitsJson", "[]")),
                         isActive = getBoolean(fields, "isActive", true),
                         createdAt = getLong(fields, "createdAt", System.currentTimeMillis()),
@@ -128,16 +222,20 @@ class CloudSyncManager(
             if (remoteCustomers.isNotEmpty()) {
                 val parsedCustomers = remoteCustomers.map { (docId, fields) ->
                     val id = getString(fields, "id", docId)
+                    val balance = getDouble(fields, "balance", getDouble(fields, "currentBalance", 0.0))
+                    val code = getString(fields, "cCode", getString(fields, "code", "1001"))
+                    val mobile = getString(fields, "mobile", getString(fields, "phone", ""))
+
                     CustomerEntity(
                         id = id,
-                        code = getString(fields, "code", getString(fields, "cCode", "1001")),
+                        code = code,
                         name = getString(fields, "name", "عميل"),
-                        phone = getString(fields, "phone", getString(fields, "mobile", "")),
-                        mobile = getString(fields, "mobile", getString(fields, "phone", "")),
+                        phone = mobile,
+                        mobile = mobile,
                         address = getString(fields, "address", ""),
                         initialBalance = getDouble(fields, "initialBalance", 0.0),
-                        currentBalance = getDouble(fields, "currentBalance", getDouble(fields, "balance", 0.0)),
-                        balance = getDouble(fields, "balance", getDouble(fields, "currentBalance", 0.0)),
+                        currentBalance = balance,
+                        balance = balance,
                         creditLimit = getDouble(fields, "creditLimit", 0.0),
                         notes = getString(fields, "notes", ""),
                         isActive = getBoolean(fields, "isActive", true),
@@ -169,12 +267,12 @@ class CloudSyncManager(
                         total = getDouble(fields, "total", 0.0),
                         paidAmount = getDouble(fields, "paidAmount", 0.0),
                         remainingAmount = getDouble(fields, "remainingAmount", 0.0),
-                        previousCustomerBalance = getDouble(fields, "previousCustomerBalance", 0.0),
+                        previousCustomerBalance = getDouble(fields, "prevCustomerBalance", getDouble(fields, "previousCustomerBalance", 0.0)),
                         newCustomerBalance = getDouble(fields, "newCustomerBalance", getDouble(fields, "newBalance", 0.0)),
                         newBalance = getDouble(fields, "newBalance", getDouble(fields, "newCustomerBalance", 0.0)),
                         itemsJson = getString(fields, "itemsJson", "[]"),
                         notes = getString(fields, "notes", ""),
-                        createdBy = getString(fields, "createdBy", "المدير"),
+                        createdBy = getString(fields, "cashierName", getString(fields, "createdBy", "المدير")),
                         createdAt = getLong(fields, "createdAt", System.currentTimeMillis()),
                         isCancelled = getBoolean(fields, "isCancelled", false)
                     )
@@ -188,11 +286,12 @@ class CloudSyncManager(
             if (remoteBonds.isNotEmpty()) {
                 for ((docId, fields) in remoteBonds) {
                     val id = getString(fields, "id", docId)
+                    val type = getString(fields, "type", getString(fields, "bondType", "RECEIPT"))
                     val bond = BondEntity(
                         id = id,
                         bondNumber = getString(fields, "bondNumber", id),
-                        type = getString(fields, "type", getString(fields, "bondType", "RECEIPT")),
-                        bondType = getString(fields, "bondType", getString(fields, "type", "RECEIPT")),
+                        type = type,
+                        bondType = type,
                         date = getLong(fields, "date", System.currentTimeMillis()),
                         customerId = getString(fields, "customerId", ""),
                         customerCode = getString(fields, "customerCode", ""),
@@ -201,11 +300,11 @@ class CloudSyncManager(
                         partyType = getString(fields, "partyType", "CUSTOMER"),
                         amount = getDouble(fields, "amount", 0.0),
                         paymentMethod = getString(fields, "paymentMethod", "CASH"),
-                        previousBalance = getDouble(fields, "previousBalance", 0.0),
-                        currentBalance = getDouble(fields, "currentBalance", 0.0),
+                        previousBalance = getDouble(fields, "prevCustomerBalance", getDouble(fields, "previousBalance", 0.0)),
+                        currentBalance = getDouble(fields, "newCustomerBalance", getDouble(fields, "currentBalance", 0.0)),
                         note = getString(fields, "note", getString(fields, "notes", "")),
                         notes = getString(fields, "notes", getString(fields, "note", "")),
-                        createdBy = getString(fields, "createdBy", "المدير"),
+                        createdBy = getString(fields, "cashierName", getString(fields, "createdBy", "المدير")),
                         createdAt = getLong(fields, "createdAt", System.currentTimeMillis())
                     )
                     bondDao.insertBond(bond)
@@ -238,8 +337,9 @@ class CloudSyncManager(
             // 2.1 Upload Local Products
             val localProducts = productDao.getAllProducts()
             for (prod in localProducts) {
+                val numId = prod.id.toLongOrNull() ?: prod.code.toLongOrNull() ?: System.currentTimeMillis()
                 uploadDocToFirestore("stores/$cleanStoreCode/products", prod.id, mapOf(
-                    "id" to prod.id,
+                    "id" to numId,
                     "code" to prod.code,
                     "name" to prod.name,
                     "barcode" to prod.barcode,
@@ -247,13 +347,16 @@ class CloudSyncManager(
                     "salePrice" to prod.salePrice,
                     "costPrice" to prod.purchasePrice,
                     "purchasePrice" to prod.purchasePrice,
-                    "stockQuantity" to prod.stockQuantity,
+                    "casePrice" to prod.wholesalePrice,
+                    "wholesalePrice" to prod.wholesalePrice,
                     "stockMain" to prod.stockQuantity,
-                    "baseUnitName" to prod.baseUnitName,
+                    "stockQuantity" to prod.stockQuantity,
                     "unitName" to prod.baseUnitName,
-                    "unitsJson" to prod.unitsJson,
-                    "updatedAt" to prod.updatedAt
+                    "baseUnitName" to prod.baseUnitName,
+                    "category" to prod.category,
+                    "cloudSyncedAt" to System.currentTimeMillis()
                 ))
+                totalPushedItems++
             }
 
             // 2.2 Upload Local Customers
@@ -265,13 +368,13 @@ class CloudSyncManager(
                     "cCode" to cust.code,
                     "name" to cust.name,
                     "phone" to cust.phone,
-                    "mobile" to cust.phone,
+                    "mobile" to cust.mobile,
                     "address" to cust.address,
-                    "currentBalance" to cust.currentBalance,
                     "balance" to cust.currentBalance,
-                    "initialBalance" to cust.initialBalance,
-                    "updatedAt" to cust.updatedAt
+                    "currentBalance" to cust.currentBalance,
+                    "cloudSyncedAt" to System.currentTimeMillis()
                 ))
+                totalPushedItems++
             }
 
             // 2.3 Upload Local Invoices
@@ -281,80 +384,107 @@ class CloudSyncManager(
                     "id" to inv.id,
                     "invoiceNumber" to inv.invoiceNumber,
                     "billNo" to inv.billNo,
-                    "customerName" to inv.customerName,
+                    "billType" to inv.billType,
+                    "customerId" to inv.customerId,
                     "customerCode" to inv.customerCode,
+                    "customerName" to inv.customerName,
                     "total" to inv.total,
                     "paidAmount" to inv.paidAmount,
                     "remainingAmount" to inv.remainingAmount,
-                    "billType" to inv.billType,
+                    "paymentMethod" to inv.paymentMethod,
+                    "prevCustomerBalance" to inv.previousCustomerBalance,
+                    "newCustomerBalance" to inv.newCustomerBalance,
                     "itemsJson" to inv.itemsJson,
-                    "date" to inv.date
+                    "cashierName" to inv.createdBy,
+                    "createdBy" to inv.createdBy,
+                    "date" to inv.date,
+                    "cloudSyncedAt" to System.currentTimeMillis()
                 ))
+                totalPushedItems++
             }
 
             // 2.4 Upload Local Bonds
             val localBonds = bondDao.getAllBonds()
             for (bnd in localBonds) {
-                val party = bnd.partyName.ifEmpty { bnd.customerName }
-                val bType = bnd.type.ifEmpty { bnd.bondType }
-                val noteText = bnd.note.ifEmpty { bnd.notes }
                 uploadDocToFirestore("stores/$cleanStoreCode/bonds", bnd.id, mapOf(
                     "id" to bnd.id,
                     "bondNumber" to bnd.bondNumber,
-                    "bondType" to bType,
-                    "type" to bType,
-                    "partyName" to party,
-                    "customerName" to party,
+                    "type" to bnd.type,
+                    "bondType" to bnd.bondType,
+                    "customerId" to bnd.customerId,
+                    "customerCode" to bnd.customerCode,
+                    "customerName" to bnd.customerName,
+                    "partyName" to bnd.partyName,
                     "amount" to bnd.amount,
+                    "prevCustomerBalance" to bnd.previousBalance,
+                    "newCustomerBalance" to bnd.currentBalance,
+                    "note" to bnd.note,
+                    "cashierName" to bnd.createdBy,
+                    "createdBy" to bnd.createdBy,
                     "date" to bnd.date,
-                    "notes" to noteText,
-                    "note" to noteText
+                    "cloudSyncedAt" to System.currentTimeMillis()
                 ))
+                totalPushedItems++
             }
 
-            val now = System.currentTimeMillis()
-            val finalSettings = settingsDao.getSettings() ?: SystemSettingsEntity()
-            val syncSuccessMessage = if (totalPulledItems > 0) {
-                "تم جلب ومزامنة $totalPulledItems عنصراً بنجاح من السحابة لكود ($cleanStoreCode)"
-            } else {
-                "تمت المزامنة السحابية بنجاح لكود المحل ($cleanStoreCode)"
-            }
-
-            settingsDao.insertOrUpdate(finalSettings.copy(
-                storeCode = cleanStoreCode,
-                lastSyncTimestamp = now,
-                syncStatusMessage = syncSuccessMessage
+            // 2.5 Upload Store Metadata to maintain active tenant record
+            uploadDocToFirestore("stores", cleanStoreCode, mapOf(
+                "storeCode" to cleanStoreCode,
+                "storeName" to currentSettings.businessName.ifEmpty { "محل $cleanStoreCode" },
+                "isActive" to true,
+                "maxCashiers" to 5,
+                "updatedAt" to System.currentTimeMillis()
             ))
 
+            // Sync successful!
+            val now = System.currentTimeMillis()
             _syncStatus.value = SyncStatus(
                 state = SyncState.SUCCESS,
                 isOnline = true,
                 lastSyncTime = now,
                 pendingItemsCount = 0,
-                message = syncSuccessMessage
+                message = "المزامنة السحابية متصلة بنجاح [$cleanStoreCode]"
             )
 
-            Result.success(syncSuccessMessage)
+            // Update settings timestamp
+            val updated = currentSettings.copy(
+                storeCode = cleanStoreCode,
+                lastSyncTimestamp = now,
+                syncStatusMessage = "المزامنة السحابية متصلة بنجاح"
+            )
+            settingsDao.insertOrUpdate(updated)
+
+            Result.success("✅ تمت المزامنة السحابية بنجاح ($totalPulledItems وارد / $totalPushedItems صادر)")
         } catch (e: Exception) {
-            Log.e("CloudSyncManager", "Sync failed", e)
+            Log.e("CloudSyncManager", "Sync failure: ${e.message}", e)
             _syncStatus.value = SyncStatus(
                 state = SyncState.ERROR,
                 isOnline = isNetworkAvailable(),
                 lastSyncTime = _syncStatus.value.lastSyncTime,
-                message = "خطأ في المزامنة: ${e.localizedMessage ?: "تعذر الاتصال بالسحابة"}"
+                message = "خطأ في المزامنة: ${e.message ?: "تحقق من الاتصال"}"
             )
             Result.failure(e)
         }
+    }
+
+    // =========================================================================
+    // HTTP FIRESTORE REST API HELPERS WITH AUTHENTICATED API KEY
+    // =========================================================================
+
+    private fun buildUrl(baseUrl: String, path: String): URL {
+        val sep = if (baseUrl.contains("?")) "&" else "?"
+        return URL("$baseUrl/$path${sep}key=$FIREBASE_API_KEY")
     }
 
     private fun fetchCollectionFromFirestore(collectionPath: String): List<Pair<String, JsonObject>> {
         val result = mutableListOf<Pair<String, JsonObject>>()
         for (baseUrl in baseUrls) {
             try {
-                val urlString = "$baseUrl/$collectionPath"
-                val url = URL(urlString)
+                val url = buildUrl(baseUrl, collectionPath)
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "GET"
+                conn.setRequestProperty("x-goog-api-key", FIREBASE_API_KEY)
+                conn.setRequestProperty("Accept", "application/json")
                 conn.connectTimeout = 7000
                 conn.readTimeout = 7000
 
@@ -386,10 +516,11 @@ class CloudSyncManager(
     private fun fetchDocumentFromFirestore(documentPath: String): JsonObject? {
         for (baseUrl in baseUrls) {
             try {
-                val urlString = "$baseUrl/$documentPath"
-                val url = URL(urlString)
+                val url = buildUrl(baseUrl, documentPath)
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "GET"
+                conn.setRequestProperty("x-goog-api-key", FIREBASE_API_KEY)
+                conn.setRequestProperty("Accept", "application/json")
                 conn.connectTimeout = 7000
                 conn.readTimeout = 7000
 
@@ -411,11 +542,13 @@ class CloudSyncManager(
     private fun uploadDocToFirestore(collectionPath: String, docId: String, data: Map<String, Any>) {
         for (baseUrl in baseUrls) {
             try {
-                val urlString = "$baseUrl/$collectionPath/$docId"
-                val url = URL(urlString)
+                val path = if (docId.isNotEmpty()) "$collectionPath/$docId" else collectionPath
+                val url = buildUrl(baseUrl, path)
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "PATCH"
+                conn.setRequestProperty("x-goog-api-key", FIREBASE_API_KEY)
                 conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                conn.setRequestProperty("Accept", "application/json")
                 conn.doOutput = true
                 conn.connectTimeout = 7000
                 conn.readTimeout = 7000

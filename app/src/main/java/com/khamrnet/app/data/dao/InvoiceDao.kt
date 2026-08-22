@@ -29,4 +29,7 @@ interface InvoiceDao {
 
     @Query("UPDATE invoices SET isCancelled = 1 WHERE id = :id")
     suspend fun cancelInvoice(id: String)
+
+    @Query("DELETE FROM invoices")
+    suspend fun deleteAllInvoices()
 }
