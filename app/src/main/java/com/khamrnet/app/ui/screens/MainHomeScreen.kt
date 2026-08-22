@@ -80,7 +80,17 @@ fun MainHomeScreen(
     val totalCashCollected = totalCashSales + totalReceiptBonds
     val drawerBalance = (totalCashCollected - totalPaymentBonds).coerceAtLeast(0.0)
 
+    // Compute remaining cashiers due amount if any
+    val cashiersRemainingDue = remember(invoices, bonds) {
+        val cashierInvoices = invoices.filter { !it.isCancelled && it.cashierId.isNotEmpty() && it.cashierId != "admin" }
+        val cashierReceipts = bonds.filter { it.type == "RECEIPT" && it.cashierId.isNotEmpty() && it.cashierId != "admin" }
+        val cashierPayments = bonds.filter { it.type == "PAYMENT" && it.cashierId.isNotEmpty() && it.cashierId != "admin" }
+        (cashierInvoices.sumOf { it.paidAmount } + cashierReceipts.sumOf { it.amount } - cashierPayments.sumOf { it.amount }).coerceAtLeast(0.0)
+    }
+
+    // 12 Full Screen Grid Items exactly matching the screenshot
     val menuItems = listOf(
+        // Row 1
         AppMenuItem(
             id = "products",
             title = "بيانات الاصناف",
@@ -102,6 +112,7 @@ fun MainHomeScreen(
             iconBgColor = Color(0xFFFAF5FF),
             iconTintColor = Color(0xFF7C3AED)
         ),
+        // Row 2
         AppMenuItem(
             id = "bonds",
             title = "السندات",
@@ -123,6 +134,7 @@ fun MainHomeScreen(
             iconBgColor = Color(0xFFECFDF5),
             iconTintColor = Color(0xFF059669)
         ),
+        // Row 3
         AppMenuItem(
             id = "expenses",
             title = "المصاريف",
@@ -131,11 +143,27 @@ fun MainHomeScreen(
             iconTintColor = Color(0xFFE11D48)
         ),
         AppMenuItem(
-            id = "reports",
-            title = "التقارير والأرباح",
-            icon = Icons.Default.TrendingUp,
-            iconBgColor = Color(0xFFFEF3C7),
-            iconTintColor = Color(0xFFB45309)
+            id = "card-generation",
+            title = "توليد الكروت",
+            icon = Icons.Default.Wifi,
+            iconBgColor = Color(0xFFF0F9FF),
+            iconTintColor = Color(0xFF0284C7),
+            badge = "قريباً"
+        ),
+        AppMenuItem(
+            id = "users",
+            title = "الكاشير",
+            icon = Icons.Default.PersonOutline,
+            iconBgColor = Color(0xFFEEF2FF),
+            iconTintColor = Color(0xFF4F46E5)
+        ),
+        // Row 4
+        AppMenuItem(
+            id = "ledger",
+            title = "القيود المحاسبية",
+            icon = Icons.Default.AutoStories,
+            iconBgColor = Color(0xFFF0FDFA),
+            iconTintColor = Color(0xFF0F766E)
         ),
         AppMenuItem(
             id = "settings",
@@ -143,10 +171,17 @@ fun MainHomeScreen(
             icon = Icons.Default.Settings,
             iconBgColor = Color(0xFFF1F5F9),
             iconTintColor = Color(0xFF475569)
+        ),
+        AppMenuItem(
+            id = "about",
+            title = "حول البرنامج",
+            icon = Icons.Default.Info,
+            iconBgColor = Color(0xFFF0FDFA),
+            iconTintColor = Color(0xFF0F766E)
         )
     )
 
-    // Pulsing animation for sync dot
+    // Pulsing animation for sync dot & dark banner dot
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 0.8f,
@@ -170,38 +205,49 @@ fun MainHomeScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Right: Business Brand & Store Code
+                    // Right: Business Logo, Name & Subtitle
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = settings.businessName.ifEmpty { "شبكة خمر" },
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Black,
-                            color = Color(0xFF0F172A)
-                        )
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFFF0FDFA))
-                                .border(0.8.dp, Color(0xFF99F6E4), RoundedCornerShape(6.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFF0F766E)),
+                            contentAlignment = Alignment.Center
                         ) {
+                            Icon(
+                                imageVector = Icons.Default.CellTower,
+                                contentDescription = "Logo",
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        Column(horizontalAlignment = Alignment.Start) {
                             Text(
-                                text = "كود: ${settings.storeCode.ifEmpty { "001" }}",
+                                text = settings.businessName.ifEmpty { "شبكة خمر اللاسلكيه" },
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFF0F172A),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "${settings.storeAddress.ifEmpty { "خمر - السوق العام" }} • ${settings.currencyName.ifEmpty { "YER" }}",
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF0F766E)
+                                color = Color(0xFF94A3B8)
                             )
                         }
                     }
 
-                    // Left: User Badge & Logout
+                    // Left: User Badge & Logout Button
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -267,7 +313,7 @@ fun MainHomeScreen(
                     }
                 }
 
-                // Cloud Sync Status Strip (Identical to Web Bar)
+                // Cloud Sync Status Strip (Exact matching Web & Screenshot)
                 val isSyncing = syncStatus.state == SyncState.SYNCING
                 val isConnected = settings.storeCode.isNotEmpty() && syncStatus.state != SyncState.OFFLINE
                 
@@ -312,7 +358,7 @@ fun MainHomeScreen(
                             .padding(horizontal = 6.dp, vertical = 1.dp)
                     ) {
                         Text(
-                            text = if (isConnected) "إدارة الربط ❯" else "تفعيل الترخيص ❯",
+                            text = if (isConnected) "إدارة الربط ❮" else "تفعيل الترخيص ❮",
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (isConnected) Color(0xFF065F46) else Color(0xFF92400E)
@@ -322,7 +368,7 @@ fun MainHomeScreen(
             }
         },
         bottomBar = {
-            // Pinned Bottom Navigation Bar (Matching Web App Bar)
+            // Pinned Bottom Navigation Bar (Matching Web App Bar & Screenshot)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -448,29 +494,83 @@ fun MainHomeScreen(
                     title = if (userRole == "ADMIN") "خزينة الإدارة" else "رصيد صندوقك",
                     amount = df.format(drawerBalance),
                     currency = settings.currencyName,
-                    subtitle = "المتبقي بالدرج",
+                    subtitle = if (drawerBalance > 0) "المتبقي بالدرج" else "الخزينة الرئيسية",
                     icon = Icons.Default.Savings,
                     iconColor = Color(0xFF059669)
                 )
             }
 
-            // 3. Section Title
+            // 3. Dark Navy Strip ("متبقي في عهد وأدراج الكواشير للمطالبة")
+            if (userRole == "ADMIN") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF0F172A))
+                        .clickable { onNavigate("settlements") }
+                        .padding(horizontal = 10.dp, vertical = 7.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.weight(1f, fill = false)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .scale(pulseScale)
+                                .clip(CircleShape)
+                                .background(Color(0xFFFBBF24))
+                        )
+                        Text(
+                            text = "متبقي في عهد وأدراج الكواشير للمطالبة: ",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFCBD5E1)
+                        )
+                        Text(
+                            text = "${settings.currencyName} ${df.format(cashiersRemainingDue)}",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFFFDE047)
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color.White.copy(alpha = 0.15f))
+                            .padding(horizontal = 6.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = "تصفية وقبض ⚡",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF99F6E4)
+                        )
+                    }
+                }
+            }
+
+            // 4. Section Title
             Text(
                 text = "شاشات وأقسام النظام المتاحة لك",
-                fontSize = 11.sp,
+                fontSize = 11.5.sp,
                 fontWeight = FontWeight.Black,
                 color = Color(0xFF475569),
-                modifier = Modifier.padding(horizontal = 2.dp, vertical = 2.dp)
+                modifier = Modifier.padding(horizontal = 2.dp, vertical = 1.dp)
             )
 
-            // 4. Main Navigation Grid (3 Columns, Compact Box Cards like Web App)
+            // 5. Main Navigation Grid (3 Columns x 4 Rows = 12 Boxes exactly matching screenshot)
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(290.dp)
+                    .height(370.dp)
             ) {
                 items(menuItems) { item ->
                     Card(
@@ -483,38 +583,60 @@ fun MainHomeScreen(
                         border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFFE2E8F0)),
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                     ) {
-                        Column(
+                        Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(6.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                                .padding(5.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(item.iconBgColor)
-                                    .border(0.6.dp, item.iconTintColor.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
-                                contentAlignment = Alignment.Center
+                            // Badge if present (like "قريباً")
+                            if (item.badge != null) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopStart)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Color(0xFFF59E0B))
+                                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                                ) {
+                                    Text(
+                                        text = item.badge,
+                                        fontSize = 7.5.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
                             ) {
-                                Icon(
-                                    imageVector = item.icon,
-                                    contentDescription = item.title,
-                                    tint = item.iconTintColor,
-                                    modifier = Modifier.size(15.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(item.iconBgColor)
+                                        .border(0.6.dp, item.iconTintColor.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = item.icon,
+                                        contentDescription = item.title,
+                                        tint = item.iconTintColor,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(5.dp))
+                                Text(
+                                    text = item.title,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF1E293B),
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = item.title,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF1E293B),
-                                textAlign = TextAlign.Center,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
                         }
                     }
                 }
