@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.khamrnet.app.data.model.ProductEntity
 import com.khamrnet.app.data.model.SystemSettingsEntity
+import com.khamrnet.app.util.OperationNumberGenerator
 import java.text.DecimalFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -752,10 +753,17 @@ fun StockTransferScreen(
                             Button(
                                 onClick = {
                                     val now = System.currentTimeMillis()
+                                    val generatedOpNums = mutableListOf<String>()
                                     val newTransfers = transferItems.map { itm ->
+                                        val transferNo = OperationNumberGenerator.generateOperationNumber(
+                                            userCode = "101",
+                                            opTypeCode = "3",
+                                            existingNumbers = generatedOpNums
+                                        )
+                                        generatedOpNums.add(transferNo)
                                         TransferHistoryItem(
                                             id = UUID.randomUUID().toString(),
-                                            transferNumber = "#TR-${(1000..9999).random()}",
+                                            transferNumber = transferNo,
                                             productName = itm.product.name,
                                             quantity = itm.quantity,
                                             unitName = if (itm.isMajorUnit) "صفحه" else (itm.product.baseUnitName.ifEmpty { "كرت" }),
