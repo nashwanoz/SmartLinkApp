@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.khamrnet.app"
-        minSdk = 28 // Android 9.0 Pie (Performance, Stable Bluetooth, Modern SQLite)
+        minSdk = 28
         targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
