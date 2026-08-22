@@ -8,7 +8,7 @@ import com.google.gson.Gson
 import com.khamrnet.app.data.database.AppDatabase
 import com.khamrnet.app.data.model.*
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateOf
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
@@ -36,8 +36,8 @@ class CloudSyncManager(
     private val context: Context,
     private val database: AppDatabase
 ) {
-    private val _syncStatus = MutableStateOf(SyncStatus())
-    val syncStatus: StateFlow<SyncStatus> = _syncStatus
+    private val _syncStatus = MutableStateFlow(SyncStatus())
+    val syncStatus: StateFlow<SyncStatus> = _syncStatus.asStateFlow()
 
     // Firebase REST API endpoints for direct offline/online cloud sync
     private val firebaseProjectId = "gen-lang-client-0683616902"
@@ -94,11 +94,11 @@ class CloudSyncManager(
                     "id" to prod.id,
                     "code" to prod.code,
                     "name" to prod.name,
-                    "price" to prod.price,
-                    "costPrice" to prod.costPrice,
+                    "price" to prod.salePrice,
+                    "costPrice" to prod.purchasePrice,
                     "stockQuantity" to prod.stockQuantity,
                     "baseUnitName" to prod.baseUnitName,
-                    "subUnitsJson" to prod.subUnitsJson,
+                    "unitsJson" to prod.unitsJson,
                     "updatedAt" to prod.updatedAt
                 ))
             }
@@ -139,14 +139,17 @@ class CloudSyncManager(
             // 5. Upload Bonds
             val localBonds = bondDao.getAllBonds()
             for (bnd in localBonds) {
+                val party = bnd.partyName.ifEmpty { bnd.customerName }
+                val bType = bnd.type.ifEmpty { bnd.bondType }
+                val noteText = bnd.note.ifEmpty { bnd.notes }
                 uploadDocToFirestore("stores/$cleanStoreCode/bonds", bnd.id, mapOf(
                     "id" to bnd.id,
                     "bondNumber" to bnd.bondNumber,
-                    "bondType" to bnd.bondType,
-                    "partyName" to bnd.partyName,
+                    "bondType" to bType,
+                    "partyName" to party,
                     "amount" to bnd.amount,
                     "date" to bnd.date,
-                    "notes" to bnd.notes
+                    "notes" to noteText
                 ))
             }
 
