@@ -190,15 +190,40 @@ class MainActivity : ComponentActivity() {
                                             settings = settings,
                                             bonds = allBonds,
                                             customers = allCustomers,
+                                            invoices = allInvoices,
                                             currentUserName = currentUserName,
+                                            syncStatus = syncStatus,
+                                            onTriggerSync = {
+                                                coroutineScope.launch {
+                                                    val res = syncManager.performSync(settings.storeCode)
+                                                    if (res.isSuccess) {
+                                                        Toast.makeText(this@MainActivity, "✅ تمت المزامنة السحابية بنجاح", Toast.LENGTH_SHORT).show()
+                                                    } else {
+                                                        Toast.makeText(this@MainActivity, res.exceptionOrNull()?.message ?: "خطأ في المزامنة", Toast.LENGTH_LONG).show()
+                                                    }
+                                                }
+                                            },
+                                            onUpdateStoreCode = { newCode ->
+                                                coroutineScope.launch(Dispatchers.IO) {
+                                                    val updated = settings.copy(storeCode = newCode)
+                                                    repository.updateSettings(updated)
+                                                    syncManager.performSync(newCode)
+                                                }
+                                            },
                                             onSaveBond = { bond ->
                                                 coroutineScope.launch(Dispatchers.IO) {
                                                     repository.insertBond(bond)
                                                     syncManager.performSync(settings.storeCode)
                                                 }
                                             },
+                                            onNavigate = { route ->
+                                                currentScreen = route
+                                            },
                                             onNavigateBack = {
                                                 currentScreen = "home"
+                                            },
+                                            onLogout = {
+                                                currentScreen = "login"
                                             }
                                         )
                                     }
