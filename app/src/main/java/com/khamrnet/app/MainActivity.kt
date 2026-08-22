@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import com.khamrnet.app.data.model.SystemSettingsEntity
 import com.khamrnet.app.sync.SyncStatus
+import com.khamrnet.app.ui.KhamrTheme
 import com.khamrnet.app.ui.screens.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -30,7 +31,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             // Force RTL Layout for complete Arabic support across all Android devices
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                MaterialTheme {
+                KhamrTheme {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
@@ -74,6 +75,10 @@ class MainActivity : ComponentActivity() {
                                         MainHomeScreen(
                                             settings = settings,
                                             currentUserName = currentUserName,
+                                            invoices = allInvoices,
+                                            bonds = allBonds,
+                                            products = allProducts,
+                                            customers = allCustomers,
                                             syncStatus = syncStatus,
                                             onTriggerSync = {
                                                 coroutineScope.launch {
