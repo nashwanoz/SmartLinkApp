@@ -71,7 +71,7 @@ fun CashierSettlementScreen(
         cashierInvoices.sumOf { it.remainingAmount }
     }
     val totalSales = remember(cashierInvoices) {
-        cashierInvoices.sumOf { it.totalAmount }
+        cashierInvoices.sumOf { it.total }
     }
 
     val cashierReceipts = remember(bonds, selectedCashier) {
