@@ -22,13 +22,16 @@ import androidx.compose.ui.window.DialogProperties
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StoreActivationDialog(
-    currentStoreCode: String,
-    businessName: String,
-    isOpen: Boolean,
-    onDismiss: () -> Unit,
-    onConfirmActivation: (newStoreCode: String) -> Unit
+    currentStoreCode: String = "",
+    businessName: String = "",
+    isOpen: Boolean = true,
+    onDismiss: () -> Unit = {},
+    onConfirmActivation: (newStoreCode: String) -> Unit = {},
+    onSaveStoreCode: ((newStoreCode: String) -> Unit)? = null
 ) {
     if (!isOpen) return
+
+    val handleSave = onSaveStoreCode ?: onConfirmActivation
 
     var inputCode by remember(currentStoreCode) { mutableStateOf(currentStoreCode) }
     var isLoading by remember { mutableStateOf(false) }
@@ -258,7 +261,7 @@ fun StoreActivationDialog(
                                 return@Button
                             }
                             isLoading = true
-                            onConfirmActivation(code)
+                            handleSave(code)
                         },
                         enabled = !isLoading,
                         shape = RoundedCornerShape(12.dp),

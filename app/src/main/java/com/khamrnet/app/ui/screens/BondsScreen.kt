@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -26,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -39,6 +41,7 @@ import com.khamrnet.app.data.model.InvoiceEntity
 import com.khamrnet.app.data.model.SystemSettingsEntity
 import com.khamrnet.app.sync.SyncState
 import com.khamrnet.app.sync.SyncStatus
+import com.khamrnet.app.ui.components.SettingsBottomNavBar
 import com.khamrnet.app.ui.components.StoreActivationDialog
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -157,7 +160,7 @@ fun BondsScreen(
 
             // Invoices as Debits
             custInvoices.forEach { inv ->
-                val debitAmt = inv.finalTotal - inv.paidAmount
+                val debitAmt = inv.total - inv.paidAmount
                 if (debitAmt > 0) {
                     runningBal += debitAmt
                     entries.add(
@@ -226,7 +229,7 @@ fun BondsScreen(
             }
         } else {
             // General / all accounts summary
-            val totalInvoicesDebit = invoices.sumOf { it.finalTotal - it.paidAmount }
+            val totalInvoicesDebit = invoices.sumOf { it.total - it.paidAmount }
             val totalReceiptsCredit = bonds.filter { it.type == "RECEIPT" || it.bondType == "RECEIPT" }.sumOf { it.amount }
             runningBal = totalInvoicesDebit - totalReceiptsCredit
             if (runningBal <= 0 && customers.isNotEmpty()) {

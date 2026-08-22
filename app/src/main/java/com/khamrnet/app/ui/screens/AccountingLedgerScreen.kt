@@ -36,6 +36,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.khamrnet.app.data.model.*
 import com.khamrnet.app.sync.SyncState
 import com.khamrnet.app.sync.SyncStatus
+import com.khamrnet.app.ui.components.SettingsBottomNavBar
 import com.khamrnet.app.ui.components.StoreActivationDialog
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -235,8 +236,8 @@ fun AccountingLedgerScreen(
                                     date = inv.date,
                                     docType = "فاتورة",
                                     docNumber = inv.invoiceNumber,
-                                    description = "مبيعات فاتورة - ${inv.customerName} (${inv.itemsCount} أصناف)",
-                                    debitAmount = inv.totalAmount,
+                                    description = "مبيعات فاتورة - ${inv.customerName}",
+                                    debitAmount = inv.total,
                                     creditAmount = 0.0,
                                     runningBalance = 0.0
                                 )
@@ -363,7 +364,7 @@ fun AccountingLedgerScreen(
                                 docNumber = inv.invoiceNumber,
                                 description = "إيراد مبيعات فاتورة #${inv.invoiceNumber}",
                                 debitAmount = 0.0,
-                                creditAmount = inv.totalAmount,
+                                creditAmount = inv.total,
                                 runningBalance = 0.0
                             )
                         )
@@ -401,7 +402,7 @@ fun AccountingLedgerScreen(
                                 docNumber = inv.invoiceNumber,
                                 description = "خروج أصناف فاتورة #${inv.invoiceNumber}",
                                 debitAmount = 0.0,
-                                creditAmount = inv.totalAmount,
+                                creditAmount = inv.total,
                                 runningBalance = 0.0
                             )
                         )
