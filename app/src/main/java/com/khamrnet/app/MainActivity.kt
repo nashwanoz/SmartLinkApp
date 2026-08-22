@@ -190,6 +190,85 @@ class MainActivity : ComponentActivity() {
                                             }
                                         )
                                     }
+                                    "transfer" -> {
+                                        StockTransferScreen(
+                                            settings = settings,
+                                            products = allProducts,
+                                            currentUserName = currentUserName,
+                                            onSaveTransfer = {
+                                                coroutineScope.launch(Dispatchers.IO) {
+                                                    syncManager.performSync(settings.storeCode)
+                                                }
+                                            },
+                                            onNavigateBack = {
+                                                currentScreen = "home"
+                                            }
+                                        )
+                                    }
+                                    "settlements" -> {
+                                        CashierSettlementScreen(
+                                            settings = settings,
+                                            invoices = allInvoices,
+                                            bonds = allBonds,
+                                            products = allProducts,
+                                            currentUserName = currentUserName,
+                                            onSaveSettlement = { amt, cashier, notes ->
+                                                coroutineScope.launch(Dispatchers.IO) {
+                                                    syncManager.performSync(settings.storeCode)
+                                                }
+                                            },
+                                            onNavigateBack = {
+                                                currentScreen = "home"
+                                            }
+                                        )
+                                    }
+                                    "expenses" -> {
+                                        ExpensesScreen(
+                                            settings = settings,
+                                            currentUserName = currentUserName,
+                                            onNavigateBack = {
+                                                currentScreen = "home"
+                                            }
+                                        )
+                                    }
+                                    "card-generation" -> {
+                                        CardGenerationScreen(
+                                            settings = settings,
+                                            currentUserName = currentUserName,
+                                            onNavigateBack = {
+                                                currentScreen = "home"
+                                            }
+                                        )
+                                    }
+                                    "users" -> {
+                                        UsersManagementScreen(
+                                            settings = settings,
+                                            currentUserName = currentUserName,
+                                            onNavigateBack = {
+                                                currentScreen = "home"
+                                            }
+                                        )
+                                    }
+                                    "ledger" -> {
+                                        AccountingLedgerScreen(
+                                            settings = settings,
+                                            invoices = allInvoices,
+                                            bonds = allBonds,
+                                            customers = allCustomers,
+                                            currentUserName = currentUserName,
+                                            onNavigateBack = {
+                                                currentScreen = "home"
+                                            }
+                                        )
+                                    }
+                                    "about" -> {
+                                        AboutScreen(
+                                            settings = settings,
+                                            onNavigateBack = {
+                                                currentScreen = "home"
+                                            }
+                                        )
+                                    }
                                     "reports" -> {
                                         ReportsScreen(
                                             settings = settings,
