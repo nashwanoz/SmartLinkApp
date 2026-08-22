@@ -272,7 +272,7 @@ fun CardGenerationScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                settings.storeName.ifEmpty { "شبكة خمر نت" },
+                                settings.businessName.ifEmpty { "شبكة خمر نت" },
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF0284C7)
