@@ -177,6 +177,8 @@ class MainActivity : ComponentActivity() {
                                             settings = settings,
                                             products = allProducts,
                                             customers = allCustomers,
+                                            invoices = allInvoices,
+                                            bonds = allBonds,
                                             currentUserName = currentUserName,
                                             onSaveInvoice = { invoice, items ->
                                                 coroutineScope.launch(Dispatchers.IO) {
