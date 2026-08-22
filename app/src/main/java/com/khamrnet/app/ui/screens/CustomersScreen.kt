@@ -47,14 +47,11 @@ fun CustomersScreen(
     var selectedCustomer by remember { mutableStateOf<CustomerEntity?>(null) }
     var isModalOpen by remember { mutableStateOf(false) }
     var editingCustomer by remember { mutableStateOf<CustomerEntity?>(null) }
-    var customerToDelete by remember { mutableStateOf<CustomerEntity?>(null) }
-
-    // Calculation of Total Debts
-    val totalDebts = remember(customers) { customers.filter { it.currentBalance > 0 }.sumOf { it.currentBalance } }
+    var isDropdownOpen by remember { mutableStateOf(false) }
 
     val filteredCustomers = remember(customers, searchTerm) {
         val s = searchTerm.trim().lowercase()
-        if (s.isEmpty()) customers
+        if (s.isEmpty()) emptyList()
         else customers.filter {
             it.name.lowercase().contains(s) || it.code.contains(s) || it.phone.contains(s)
         }
@@ -65,15 +62,7 @@ fun CustomersScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("العملاء والحسابات", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White)
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color.White.copy(alpha = 0.2f))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text("${customers.size} عميل", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
+                        Text("بيانات العملاء", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White)
                     }
                 },
                 navigationIcon = {
@@ -81,26 +70,10 @@ fun CustomersScreen(
                         Icon(Icons.Default.ArrowForward, contentDescription = "رجوع", tint = Color.White)
                     }
                 },
-                actions = {
-                    Button(
-                        onClick = {
-                            editingCustomer = null
-                            isModalOpen = true
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Icon(Icons.Default.PersonAdd, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("إضافة عميل", fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color.White)
-                    }
-                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F766E))
             )
         },
-        containerColor = Color(0xFFF1F5F9)
+        containerColor = Color(0xFFF8FAFC)
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -109,169 +82,497 @@ fun CustomersScreen(
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // 1. Debt Summary Card
-            Card(
+            // 1. Subheader: Title "بيانات العملاء" & Button "+ اضافه عميل"
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF2F2)),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFECDD3))
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                // Add Customer Button (Left)
+                Button(
+                    onClick = {
+                        editingCustomer = null
+                        isModalOpen = true
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFFEE2E2)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = Color(0xFFDC2626), modifier = Modifier.size(22.dp))
-                        }
-                        Column {
-                            Text("إجمالي المديونية عند العملاء:", fontSize = 11.sp, color = Color(0xFF991B1B), fontWeight = FontWeight.Bold)
-                            Text("${totalDebts.toInt()} ${settings.currencyName}", fontSize = 17.sp, fontWeight = FontWeight.Black, color = Color(0xFFDC2626))
-                        }
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "اضافه عميل",
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White
+                    )
+                }
+
+                // Title & Subtitle (Right)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "بيانات العملاء",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFF0F172A)
+                        )
+                        Text(
+                            text = "البحث عن الحسابات واستعراض تفاصيل الأرصدة وآخر الحركات",
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF64748B)
+                        )
                     }
 
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color.White)
-                            .border(1.dp, Color(0xFFFECDD3), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFFF0FDFA))
+                            .border(0.8.dp, Color(0xFFCCFBF1), RoundedCornerShape(10.dp)),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            "${customers.count { it.currentBalance > 0 }} عليهم ديون",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFB91C1C)
+                        Icon(
+                            imageVector = Icons.Default.People,
+                            contentDescription = null,
+                            tint = Color(0xFF0F766E),
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
             }
 
             // 2. Search Bar
-            OutlinedTextField(
-                value = searchTerm,
-                onValueChange = { searchTerm = it },
-                placeholder = { Text("🔍 ابحث باسم العميل أو الكود أو الهاتف...", fontSize = 12.sp, color = Color(0xFF94A3B8)) },
-                singleLine = true,
-                trailingIcon = {
-                    if (searchTerm.isNotEmpty()) {
-                        IconButton(onClick = { searchTerm = "" }) {
-                            Icon(Icons.Default.Clear, contentDescription = null, tint = Color(0xFF64748B))
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = searchTerm,
+                    onValueChange = {
+                        searchTerm = it
+                        isDropdownOpen = true
+                    },
+                    placeholder = {
+                        Text(
+                            "ابحث عن العميل بالاسم، كود العميل (C_CODE)، أو رقم الهاتف...",
+                            fontSize = 10.5.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+                    },
+                    singleLine = true,
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF0F766E), modifier = Modifier.size(18.dp))
+                    },
+                    trailingIcon = {
+                        if (searchTerm.isNotEmpty()) {
+                            IconButton(onClick = {
+                                searchTerm = ""
+                                isDropdownOpen = false
+                            }) {
+                                Icon(Icons.Default.Clear, contentDescription = null, tint = Color(0xFF64748B), modifier = Modifier.size(16.dp))
+                            }
                         }
-                    }
-                },
-                shape = RoundedCornerShape(14.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    focusedBorderColor = Color(0xFF0F766E),
-                    unfocusedBorderColor = Color(0xFFCBD5E1)
-                ),
-                modifier = Modifier.fillMaxWidth()
-            )
+                    },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White,
+                        focusedBorderColor = Color(0xFF059669),
+                        unfocusedBorderColor = Color(0xFFCBD5E1)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
-            // 3. Customers List
-            if (filteredCustomers.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.White)
-                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(16.dp))
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
+            // 3. Main Body
+            if (isDropdownOpen && searchTerm.isNotBlank()) {
+                // Dropdown suggestions
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFFE2E8F0))
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Default.PeopleOutline, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(48.dp))
-                        Text(if (searchTerm.isNotEmpty()) "لا يوجد عملاء يطابقون بحثك" else "لا يوجد عملاء مسجلين حتى الآن", fontSize = 13.sp, color = Color(0xFF64748B), fontWeight = FontWeight.Bold)
-                    }
-                }
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    items(filteredCustomers, key = { it.id }) { cust ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    editingCustomer = cust
-                                    isModalOpen = true
-                                },
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                    if (filteredCustomers.isEmpty()) {
+                        Text(
+                            text = "لا يوجد عملاء يطابقون البحث",
+                            fontSize = 11.5.sp,
+                            color = Color(0xFF64748B),
+                            modifier = Modifier.padding(14.dp)
+                        )
+                    } else {
+                        LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp)) {
+                            items(filteredCustomers) { cust ->
                                 Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            selectedCustomer = cust
+                                            searchTerm = ""
+                                            isDropdownOpen = false
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(42.dp)
-                                            .clip(CircleShape)
-                                            .background(if (cust.currentBalance > 0) Color(0xFFFEF2F2) else Color(0xFFECFDF5)),
-                                        contentAlignment = Alignment.Center
+                                    Text(
+                                        text = "${cust.currentBalance.toInt()} ${settings.currencyName}",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = if (cust.currentBalance > 0) Color(0xFFDC2626) else Color(0xFF059669)
+                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
                                         Text(
-                                            text = cust.name.take(1),
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = if (cust.currentBalance > 0) Color(0xFFDC2626) else Color(0xFF059669)
+                                            text = cust.name,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF0F172A)
                                         )
-                                    }
-
-                                    Column {
-                                        Text(cust.name, fontSize = 13.5.sp, fontWeight = FontWeight.Black, color = Color(0xFF0F172A), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            Text("كود: ${cust.code}", fontSize = 10.sp, color = Color(0xFF64748B), fontWeight = FontWeight.Bold)
-                                            if (cust.phone.isNotBlank()) {
-                                                Text("• ${cust.phone}", fontSize = 10.sp, color = Color(0xFF0F766E), fontWeight = FontWeight.Bold)
-                                            }
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(Color(0xFFF1F5F9))
+                                                .padding(horizontal = 5.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = cust.code,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Black,
+                                                color = Color(0xFF475569)
+                                            )
                                         }
                                     }
                                 }
+                                Divider(color = Color(0xFFF1F5F9), thickness = 0.8.dp)
+                            }
+                        }
+                    }
+                }
+            } else if (selectedCustomer == null) {
+                // Empty State (Image 1)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFFE2E8F0))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 36.dp, horizontal = 20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(50.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFF8FAFC)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PeopleOutline,
+                                contentDescription = null,
+                                tint = Color(0xFF94A3B8),
+                                modifier = Modifier.size(30.dp)
+                            )
+                        }
 
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    // Balance Badge
-                                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "لم يتم اختيار عميل بعد",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFF1E293B)
+                        )
+
+                        Text(
+                            text = "يرجى كتابة اسم أو كود العميل في مربع البحث أعلاه لعرض بطاقة الحساب والبيانات المالية.",
+                            fontSize = 10.5.sp,
+                            color = Color(0xFF94A3B8),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+                }
+            } else {
+                // Selected Customer Cards (Image 2)
+                val cust = selectedCustomer!!
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Dark Banner: Account Name + Code + Search Other
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Search other button
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0xFF1E293B))
+                                    .border(0.8.dp, Color(0xFF334155), RoundedCornerShape(10.dp))
+                                    .clickable { selectedCustomer = null }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = "→ بحث عن عميل أخر",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFCBD5E1)
+                                )
+                            }
+
+                            // Account name & code
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = "اسم الحساب:",
+                                        fontSize = 9.sp,
+                                        color = Color(0xFF94A3B8)
+                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(Color(0xFF1E293B))
+                                                .border(0.8.dp, Color(0xFF334155), RoundedCornerShape(6.dp))
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = "C_CODE: ${cust.code}",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Black,
+                                                color = Color(0xFFE2E8F0)
+                                            )
+                                        }
                                         Text(
-                                            text = "${cust.currentBalance.toInt()} ${settings.currencyName}",
+                                            text = cust.name,
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Black,
-                                            color = if (cust.currentBalance > 0) Color(0xFFDC2626) else Color(0xFF059669)
-                                        )
-                                        Text(
-                                            text = if (cust.currentBalance > 0) "عليه دين" else "خالص الحساب",
-                                            fontSize = 9.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (cust.currentBalance > 0) Color(0xFFDC2626) else Color(0xFF059669)
+                                            color = Color.White
                                         )
                                     }
+                                }
 
-                                    // WhatsApp Action
+                                Box(
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xFF0F766E).copy(alpha = 0.3f))
+                                        .border(0.8.dp, Color(0xFF0F766E), RoundedCornerShape(10.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Person,
+                                        contentDescription = null,
+                                        tint = Color(0xFF2DD4BF),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Card 1: Last Invoice (تاريخ اخر فاتورة)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFFE2E8F0))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(horizontalAlignment = Alignment.Start) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color(0xFFEFF6FF))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text("IAS_BILL", fontSize = 9.5.sp, fontWeight = FontWeight.Black, color = Color(0xFF1D4ED8))
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("${settings.currencyName} 540", fontSize = 11.5.sp, fontWeight = FontWeight.Black, color = Color(0xFF1D4ED8))
+                            }
+
+                            Column(horizontalAlignment = Alignment.End) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text("تاريخ اخر فاتورة", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
+                                    Icon(Icons.Default.ReceiptLong, contentDescription = null, tint = Color(0xFF2563EB), modifier = Modifier.size(14.dp))
+                                }
+                                Text("٢٠٢٦/٠٨/٢١", fontSize = 11.sp, fontWeight = FontWeight.Black, color = Color(0xFF0F172A))
+                                Text("فاتورة رقم: 101431", fontSize = 9.5.sp, color = Color(0xFF94A3B8))
+                            }
+                        }
+                    }
+
+                    // Card 2: Last Payment (تاريخ اخر سداد)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFFE2E8F0))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(horizontalAlignment = Alignment.Start) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color(0xFFECFDF5))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text("RECEIPT", fontSize = 9.5.sp, fontWeight = FontWeight.Black, color = Color(0xFF047857))
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("${settings.currencyName} 780", fontSize = 11.5.sp, fontWeight = FontWeight.Black, color = Color(0xFF047857))
+                            }
+
+                            Column(horizontalAlignment = Alignment.End) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text("تاريخ اخر سداد", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
+                                    Icon(Icons.Default.AttachMoney, contentDescription = null, tint = Color(0xFF059669), modifier = Modifier.size(14.dp))
+                                }
+                                Text("٢٠٢٦/٠٨/٢٠", fontSize = 11.sp, fontWeight = FontWeight.Black, color = Color(0xFF0F172A))
+                                Text("سند رقم: 10313", fontSize = 9.5.sp, color = Color(0xFF94A3B8))
+                            }
+                        }
+                    }
+
+                    // Card 3: Customer Balance (رصيد العميل)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF1F2)),
+                        border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFFFECDD3))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFFFFE4E6))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                Text(
+                                    text = if (cust.currentBalance > 0) "مدين (عليه)" else "خالص",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color(0xFFBE123C)
+                                )
+                            }
+
+                            Column(horizontalAlignment = Alignment.End) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text("رصيد العميل", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
+                                    Icon(Icons.Default.CreditCard, contentDescription = null, tint = Color(0xFF475569), modifier = Modifier.size(14.dp))
+                                }
+                                Text("${settings.currencyName} ${cust.currentBalance.toInt()}", fontSize = 15.sp, fontWeight = FontWeight.Black, color = Color(0xFFBE123C))
+                                Text("الرصيد المحاسبي الإجمالي للعميل", fontSize = 9.5.sp, color = Color(0xFF94A3B8))
+                            }
+                        }
+                    }
+
+                    // Card 4: Contact info + Actions
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFFE2E8F0))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Contact Row
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (cust.phone.isNotBlank()) {
+                                    Text(cust.phone, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF334155))
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Icon(Icons.Default.Phone, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(13.dp))
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(cust.address.ifBlank { "خمر" }, fontSize = 11.sp, color = Color(0xFF334155))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(13.dp))
+                            }
+
+                            Divider(color = Color(0xFFF1F5F9), thickness = 0.8.dp)
+
+                            // Actions Row
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Right: Bond button
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xFFECFDF5))
+                                        .border(0.8.dp, Color(0xFFA7F3D0), RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            // Handle bond
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Icon(Icons.Default.Description, contentDescription = null, tint = Color(0xFF047857), modifier = Modifier.size(13.dp))
+                                        Text("سند سداد / قبض", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF065F46))
+                                    }
+                                }
+
+                                // Left: WhatsApp, Edit, Delete
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
                                     if (cust.phone.isNotBlank()) {
                                         IconButton(
                                             onClick = {
@@ -284,26 +585,40 @@ fun CustomersScreen(
                                                 }
                                             },
                                             modifier = Modifier
-                                                .size(32.dp)
+                                                .size(28.dp)
                                                 .clip(CircleShape)
-                                                .background(Color(0xFFDCFCE7))
+                                                .background(Color(0xFF10B981))
                                         ) {
-                                            Icon(Icons.Default.Phone, contentDescription = null, tint = Color(0xFF16A34A), modifier = Modifier.size(16.dp))
+                                            Icon(Icons.Default.Phone, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
                                         }
                                     }
 
-                                    // Edit Action
                                     IconButton(
                                         onClick = {
                                             editingCustomer = cust
                                             isModalOpen = true
                                         },
                                         modifier = Modifier
-                                            .size(32.dp)
-                                            .clip(RoundedCornerShape(8.dp))
+                                            .size(28.dp)
+                                            .clip(CircleShape)
                                             .background(Color(0xFFF1F5F9))
+                                            .border(0.8.dp, Color(0xFFE2E8F0), CircleShape)
                                     ) {
-                                        Icon(Icons.Default.Edit, contentDescription = null, tint = Color(0xFF0F766E), modifier = Modifier.size(15.dp))
+                                        Icon(Icons.Default.Edit, contentDescription = null, tint = Color(0xFF64748B), modifier = Modifier.size(13.dp))
+                                    }
+
+                                    IconButton(
+                                        onClick = {
+                                            onDeleteCustomer(cust)
+                                            selectedCustomer = null
+                                        },
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFFFF1F2))
+                                            .border(0.8.dp, Color(0xFFFECDD3), CircleShape)
+                                    ) {
+                                        Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFE11D48), modifier = Modifier.size(13.dp))
                                     }
                                 }
                             }
@@ -323,6 +638,7 @@ fun CustomersScreen(
             onDismiss = { isModalOpen = false },
             onSave = { savedCust ->
                 onSaveCustomer(savedCust)
+                selectedCustomer = savedCust
                 isModalOpen = false
             }
         )
