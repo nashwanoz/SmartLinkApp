@@ -252,7 +252,7 @@ fun SettingsScreen(
                     if (pairedDevices.isEmpty()) {
                         Text("لا توجد أجهزة بلوتوث مقترنة. يرجى إقران الطابعة أولاً من إعدادات البلوتوث بالهاتف.", fontSize = 10.sp, color = Color(0xFFDC2626))
                     } else {
-                        pairedDevices.forEach { dev ->
+                        for (dev in pairedDevices) {
                             val isSelected = selectedPrinterMac == dev.address
                             Surface(
                                 onClick = {
