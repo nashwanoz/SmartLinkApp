@@ -17,6 +17,11 @@ import java.io.OutputStream
 import java.text.SimpleDateFormat
 import java.util.*
 
+data class PrinterDeviceInfo(
+    val name: String,
+    val address: String
+)
+
 /**
  * High-Speed Direct Bluetooth Thermal Printer Controller (ESC/POS)
  * Sends raw bytes directly to the thermal printer in under 1 second.
@@ -39,9 +44,9 @@ class BluetoothPrinterManager(private val context: Context) {
     }
 
     @SuppressLint("MissingPermission")
-    fun getPairedPrinters(): List<BluetoothDevice> {
+    fun getPairedPrinters(): List<PrinterDeviceInfo> {
         val paired = bluetoothAdapter?.bondedDevices ?: emptySet()
-        return paired.filter { device ->
+        val filtered = paired.filter { device ->
             val name = device.name ?: ""
             name.contains("POS", ignoreCase = true) ||
             name.contains("RP", ignoreCase = true) ||
@@ -52,6 +57,43 @@ class BluetoothPrinterManager(private val context: Context) {
             name.contains("58", ignoreCase = true) ||
             name.contains("80", ignoreCase = true)
         }.ifEmpty { paired.toList() }
+
+        return filtered.map { PrinterDeviceInfo(it.name ?: "طابعة بلوتوث", it.address) }
+    }
+
+    @SuppressLint("MissingPermission")
+    suspend fun testPrint(printerMacAddress: String, paperWidth: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        var socket: BluetoothSocket? = null
+        var outputStream: OutputStream? = null
+
+        try {
+            val device = bluetoothAdapter?.getRemoteDevice(printerMacAddress)
+                ?: return@withContext Result.failure(Exception("الطابعة غير موجودة"))
+
+            bluetoothAdapter?.cancelDiscovery()
+            socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
+            socket.connect()
+            outputStream = socket.outputStream
+
+            outputStream.write(CMD_INIT)
+            outputStream.write(CMD_ALIGN_CENTER)
+            outputStream.write(CMD_BOLD_ON)
+            sendArabicText(outputStream, "=== تجربة الطباعة الحرارية ===")
+            sendArabicText(outputStream, "شبكة خمر اللاسلكيه")
+            outputStream.write(CMD_BOLD_OFF)
+            sendArabicText(outputStream, "مقاس الورق: $paperWidth")
+            val dateFormat = SimpleDateFormat("yyyy/MM/dd  hh:mm a", Locale("ar"))
+            sendArabicText(outputStream, "الوقت: ${dateFormat.format(Date())}")
+            sendArabicText(outputStream, "تم الاتصال بالطابعة بنجاح 100%")
+            outputStream.write(CMD_FEED_3_LINES)
+            outputStream.flush()
+            Result.success(true)
+        } catch (e: Exception) {
+            Result.failure(e)
+        } finally {
+            try { outputStream?.close() } catch (_: Exception) {}
+            try { socket?.close() } catch (_: Exception) {}
+        }
     }
 
     /**
