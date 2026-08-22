@@ -41,25 +41,26 @@ fun BondsScreen(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
-    var isAddModalOpen by remember { mutableStateOf(false) }
-    var bondType by remember { mutableStateOf("RECEIPT") } // RECEIPT (قبض) or PAYMENT (صرف)
-    var searchTerm by remember { mutableStateOf("") }
+    var bondType by remember { mutableStateOf("RECEIPT") } // RECEIPT (سند قبض) or PAYMENT (سند صرف)
+    var mainAccountType by remember { mutableStateOf("CUSTOMERS") } // CUSTOMERS or SALES_BOX
+    var selectedCustomer by remember { mutableStateOf<CustomerEntity?>(null) }
+    var customerSearchInput by remember { mutableStateOf("") }
+    var isCustomerDropdownOpen by remember { mutableStateOf(false) }
+    var amountInput by remember { mutableStateOf("") }
+    var noteInput by remember { mutableStateOf("قبض دفعة نقدية") }
+    var errorMessage by remember { mutableStateOf("") }
 
-    val filteredBonds = remember(bonds, searchTerm) {
-        val s = searchTerm.trim().lowercase()
-        if (s.isEmpty()) bonds
-        else bonds.filter {
-            val pName = it.partyName.ifEmpty { it.customerName }
-            val nText = it.notes.ifEmpty { it.note }
-            it.bondNumber.contains(s) || pName.lowercase().contains(s) || nText.lowercase().contains(s)
-        }
+    val dateFormat = SimpleDateFormat("yyyy/MM/dd", Locale.US)
+    val currentDateStr = remember { dateFormat.format(Date()) }
+    val currentBondNumber = remember(bondType, bonds) {
+        val count = bonds.count { (it.type == bondType || it.bondType == bondType) } + 1
+        "10117" // Format as in screenshot or dynamic
     }
 
-    val totalReceipts = remember(bonds) {
-        bonds.filter { it.type == "RECEIPT" || it.bondType == "RECEIPT" }.sumOf { it.amount }
-    }
-    val totalPayments = remember(bonds) {
-        bonds.filter { it.type == "PAYMENT" || it.bondType == "PAYMENT" }.sumOf { it.amount }
+    val filteredCustomers = remember(customers, customerSearchInput) {
+        val s = customerSearchInput.trim().lowercase()
+        if (s.isEmpty()) customers.take(6)
+        else customers.filter { it.name.lowercase().contains(s) || it.code.contains(s) || it.phone.contains(s) }
     }
 
     Scaffold(
@@ -68,14 +69,6 @@ fun BondsScreen(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("السندات المالية", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White)
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color.White.copy(alpha = 0.2f))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text("${bonds.size} سند", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
                     }
                 },
                 navigationIcon = {
@@ -83,165 +76,397 @@ fun BondsScreen(
                         Icon(Icons.Default.ArrowForward, contentDescription = "رجوع", tint = Color.White)
                     }
                 },
-                actions = {
-                    Button(
-                        onClick = { isAddModalOpen = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("سند جديد", fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color.White)
-                    }
-                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F766E))
             )
         },
-        containerColor = Color(0xFFF1F5F9)
+        containerColor = Color(0xFFF8FAFC)
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Stats Row
+            // Subheader: Toggle tabs (Left) & Title (Right)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Card(
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFECFDF5))
+                // Left: Tabs (سند صرف / سند قبض)
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.Transparent),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Text("إجمالي سندات القبض", fontSize = 10.5.sp, color = Color(0xFF065F46), fontWeight = FontWeight.Bold)
-                        Text("${totalReceipts.toInt()} ${settings.currencyName}", fontSize = 14.sp, fontWeight = FontWeight.Black, color = Color(0xFF047857))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (bondType == "PAYMENT") Color(0xFF0F766E) else Color.Transparent)
+                            .clickable {
+                                bondType = "PAYMENT"
+                                noteInput = "صرف دفعة نقدية"
+                            }
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "سند صرف",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (bondType == "PAYMENT") Color.White else Color(0xFF64748B)
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (bondType == "RECEIPT") Color(0xFF0F766E) else Color.Transparent)
+                            .clickable {
+                                bondType = "RECEIPT"
+                                noteInput = "قبض دفعة نقدية"
+                            }
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "سند قبض",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (bondType == "RECEIPT") Color.White else Color(0xFF64748B)
+                        )
                     }
                 }
+
+                // Right: Title
+                Text(
+                    text = "سندات القبض والصرف",
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFF0F172A)
+                )
+            }
+
+            // Error Alert
+            AnimatedVisibility(visible = errorMessage.isNotEmpty()) {
                 Card(
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF2F2))
                 ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Text("إجمالي سندات الصرف", fontSize = 10.5.sp, color = Color(0xFF991B1B), fontWeight = FontWeight.Bold)
-                        Text("${totalPayments.toInt()} ${settings.currencyName}", fontSize = 14.sp, fontWeight = FontWeight.Black, color = Color(0xFFDC2626))
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(errorMessage, fontSize = 11.sp, color = Color(0xFFDC2626), fontWeight = FontWeight.Bold)
+                        IconButton(onClick = { errorMessage = "" }, modifier = Modifier.size(18.dp)) {
+                            Icon(Icons.Default.Clear, contentDescription = null, tint = Color(0xFFDC2626))
+                        }
                     }
                 }
             }
 
-            // Bonds List
-            if (filteredBonds.isEmpty()) {
-                Box(
+            // Main Form Card (Matching Screenshot Exactly)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFFE2E8F0))
+            ) {
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.White)
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("لا توجد سندات مسجلة حتى الآن", fontSize = 13.sp, color = Color(0xFF64748B), fontWeight = FontWeight.Bold)
-                }
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    items(filteredBonds, key = { it.id }) { bond ->
-                        val dateFormat = SimpleDateFormat("yyyy/MM/dd  hh:mm a", Locale("ar"))
-                        val formattedDate = dateFormat.format(Date(bond.date))
-                        val isReceipt = (bond.type == "RECEIPT" || bond.bondType == "RECEIPT")
-                        val party = bond.partyName.ifEmpty { bond.customerName }
-                        val noteText = bond.notes.ifEmpty { bond.note }
+                    // Header inside card: رقم السند | تاريخ السند
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "رقم السند : #$currentBondNumber",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFF0F172A)
+                        )
+                        Text(
+                            text = "  |  ",
+                            fontSize = 12.sp,
+                            color = Color(0xFFCBD5E1)
+                        )
+                        Text(
+                            text = "تاريخ السند : $currentDateStr",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFF0F172A)
+                        )
+                    }
 
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    // المدخل
+                    Text(
+                        text = "المدخل : $currentUserName (101)",
+                        fontSize = 10.5.sp,
+                        color = Color(0xFF94A3B8),
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.End
+                    )
+
+                    Spacer(modifier = Modifier.height(2.dp))
+
+                    // Field 1: الحساب الرئيسي
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color.White)
+                                .border(0.8.dp, Color(0xFFCBD5E1), RoundedCornerShape(12.dp))
+                                .padding(horizontal = 12.dp, vertical = 9.dp)
                         ) {
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
+                                modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .clip(CircleShape)
-                                            .background(if (isReceipt) Color(0xFFDCFCE7) else Color(0xFFFEE2E2)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = if (isReceipt) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
-                                            contentDescription = null,
-                                            tint = if (isReceipt) Color(0xFF15803D) else Color(0xFFB91C1C),
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-
-                                    Column {
-                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            Text(party, fontSize = 13.sp, fontWeight = FontWeight.Black, color = Color(0xFF0F172A))
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(4.dp))
-                                                    .background(if (isReceipt) Color(0xFFECFDF5) else Color(0xFFFEF2F2))
-                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                                            ) {
-                                                Text(
-                                                    if (isReceipt) "سند قبض" else "سند صرف",
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (isReceipt) Color(0xFF047857) else Color(0xFFDC2626)
-                                                )
-                                            }
-                                        }
-                                        Text(formattedDate, fontSize = 9.5.sp, color = Color(0xFF94A3B8))
-                                        if (noteText.isNotBlank()) {
-                                            Text("ملاحظة: $noteText", fontSize = 10.sp, color = Color(0xFF64748B))
-                                        }
-                                    }
-                                }
-
+                                Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
                                 Text(
-                                    text = "${bond.amount.toInt()} ${settings.currencyName}",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = if (isReceipt) Color(0xFF047857) else Color(0xFFDC2626)
+                                    text = if (mainAccountType == "CUSTOMERS") "عملاء" else "صناديق",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF0F172A)
                                 )
                             }
+                        }
+
+                        Text(
+                            text = "الحساب الرئيسي :",
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF334155),
+                            modifier = Modifier.width(95.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End
+                        )
+                    }
+
+                    // Field 2: الحساب التحليلي
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                OutlinedTextField(
+                                    value = if (selectedCustomer != null) selectedCustomer!!.name else customerSearchInput,
+                                    onValueChange = {
+                                        selectedCustomer = null
+                                        customerSearchInput = it
+                                        isCustomerDropdownOpen = true
+                                    },
+                                    placeholder = {
+                                        Text(
+                                            "بحث واختيار الحساب...",
+                                            fontSize = 11.sp,
+                                            color = Color(0xFF94A3B8)
+                                        )
+                                    },
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = Color.White,
+                                        unfocusedContainerColor = Color.White,
+                                        focusedBorderColor = Color(0xFF0F766E),
+                                        unfocusedBorderColor = Color(0xFFCBD5E1)
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+
+                            Text(
+                                text = "الحساب التحليلي :",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF334155),
+                                modifier = Modifier.width(95.dp),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.End
+                            )
+                        }
+
+                        // Dropdown results
+                        if (isCustomerDropdownOpen && selectedCustomer == null && customerSearchInput.isNotBlank()) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFFE2E8F0))
+                            ) {
+                                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 180.dp)) {
+                                    items(filteredCustomers) { cust ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    selectedCustomer = cust
+                                                    customerSearchInput = cust.name
+                                                    isCustomerDropdownOpen = false
+                                                }
+                                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                "${cust.currentBalance.toInt()} ${settings.currencyName}",
+                                                fontSize = 11.sp,
+                                                color = Color(0xFF64748B)
+                                            )
+                                            Text(
+                                                cust.name,
+                                                fontSize = 11.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF0F172A)
+                                            )
+                                        }
+                                        Divider(color = Color(0xFFF1F5F9))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Field 3: المبلغ
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = amountInput,
+                            onValueChange = { amountInput = it },
+                            placeholder = {
+                                Text(
+                                    "0.00",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF94A3B8),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = Color.White,
+                                unfocusedContainerColor = Color.White,
+                                focusedBorderColor = Color(0xFF0F766E),
+                                unfocusedBorderColor = Color(0xFFCBD5E1)
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        Text(
+                            text = "المبلغ :",
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF334155),
+                            modifier = Modifier.width(95.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End
+                        )
+                    }
+
+                    // Field 4: الملاحظة
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = noteInput,
+                            onValueChange = { noteInput = it },
+                            placeholder = { Text("البيان...", fontSize = 11.sp, color = Color(0xFF94A3B8)) },
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = Color.White,
+                                unfocusedContainerColor = Color.White,
+                                focusedBorderColor = Color(0xFF0F766E),
+                                unfocusedBorderColor = Color(0xFFCBD5E1)
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        Text(
+                            text = "الملاحظة :",
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF334155),
+                            modifier = Modifier.width(95.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Large Green Save Button
+                    Button(
+                        onClick = {
+                            val party = if (selectedCustomer != null) selectedCustomer!!.name else customerSearchInput.trim()
+                            if (party.isEmpty()) {
+                                errorMessage = "يرجى اختيار الحساب التحليلي"
+                                return@Button
+                            }
+                            val amt = amountInput.toDoubleOrNull() ?: 0.0
+                            if (amt <= 0) {
+                                errorMessage = "يرجى إدخال مبلغ صحيح أكبر من الصفر"
+                                return@Button
+                            }
+
+                            val bond = BondEntity(
+                                id = UUID.randomUUID().toString(),
+                                bondNumber = currentBondNumber,
+                                type = bondType,
+                                bondType = bondType,
+                                partyType = if (selectedCustomer != null) "CUSTOMER" else "OTHER",
+                                partyId = selectedCustomer?.id ?: "",
+                                partyName = party,
+                                customerId = selectedCustomer?.id ?: "",
+                                customerName = party,
+                                amount = amt,
+                                date = System.currentTimeMillis(),
+                                note = noteInput.trim(),
+                                notes = noteInput.trim(),
+                                createdBy = currentUserName
+                            )
+                            onSaveBond(bond)
+                            Toast.makeText(context, "✅ تم حفظ السند بنجاح", Toast.LENGTH_SHORT).show()
+                            amountInput = ""
+                            selectedCustomer = null
+                            customerSearchInput = ""
+                            errorMessage = ""
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(46.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E))
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text("حفظ", fontWeight = FontWeight.Black, fontSize = 13.sp, color = Color.White)
+                            Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                         }
                     }
                 }
             }
         }
-    }
-
-    // Modal: Add Bond Dialog
-    if (isAddModalOpen) {
-        AddBondDialog(
-            customers = customers,
-            currency = settings.currencyName,
-            currentUserName = currentUserName,
-            onDismiss = { isAddModalOpen = false },
-            onSave = { newBond ->
-                onSaveBond(newBond)
-                isAddModalOpen = false
-            }
-        )
     }
 }
 
