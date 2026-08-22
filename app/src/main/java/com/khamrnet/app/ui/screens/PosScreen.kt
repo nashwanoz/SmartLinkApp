@@ -1,18 +1,18 @@
 package com.khamrnet.app.ui.screens
 
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -23,123 +23,109 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import com.khamrnet.app.data.model.ProductEntity
-import com.khamrnet.app.data.model.ProductUnit
-import com.khamrnet.app.data.model.SystemSettingsEntity
+import com.khamrnet.app.data.model.*
+import com.khamrnet.app.printer.BluetoothPrinterManager
+import com.khamrnet.app.util.ArabicNumberConverter
+import com.khamrnet.app.util.PdfThermalGenerator
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import java.util.UUID
-
-enum class ProductViewMode {
-    GRID, STRIP, TABLE
-}
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProductsScreen(
+fun PosScreen(
     settings: SystemSettingsEntity,
     products: List<ProductEntity>,
-    onSaveProduct: (ProductEntity) -> Unit,
-    onDeleteProduct: (ProductEntity) -> Unit,
+    customers: List<CustomerEntity>,
+    currentUserName: String,
+    onSaveInvoice: (InvoiceEntity, List<InvoiceItem>) -> Unit,
     onNavigateBack: () -> Unit
 ) {
-    var viewMode by remember { mutableStateOf(ProductViewMode.GRID) }
-    var searchTerm by remember { mutableStateOf("") }
-    var isModalOpen by remember { mutableStateOf(false) }
-    var editingProduct by remember { mutableStateOf<ProductEntity?>(null) }
-    var productToDelete by remember { mutableStateOf<ProductEntity?>(null) }
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val printerManager = remember { BluetoothPrinterManager(context) }
 
-    // Filtered products list
-    val filteredProducts = remember(products, searchTerm) {
-        val s = searchTerm.trim().lowercase()
-        if (s.isEmpty()) products
-        else {
-            products.filter { p ->
-                p.name.lowercase().contains(s) ||
-                p.code.lowercase().contains(s) ||
-                p.barcode.lowercase().contains(s) ||
-                p.baseUnitName.lowercase().contains(s)
-            }
-        }
+    // Cart Items
+    var cartItems by remember { mutableStateOf<List<InvoiceItem>>(emptyList()) }
+
+    // Customer Selection
+    var selectedCustomer by remember { mutableStateOf<CustomerEntity?>(null) }
+    var customerSearchQuery by remember { mutableStateOf("") }
+    var showCustomerSearchDialog by remember { mutableStateOf(false) }
+
+    // Payment method: "CASH" (نقدي), "CREDIT" (آجل)
+    var paymentMethod by remember { mutableStateOf("CREDIT") }
+    var paidAmountInput by remember { mutableStateOf("0") }
+    var discountInput by remember { mutableStateOf("0") }
+    var notes by remember { mutableStateOf("") }
+
+    // Selected product for unit & qty modal
+    var selectedProductForCart by remember { mutableStateOf<ProductEntity?>(null) }
+    var selectedProductUnits by remember { mutableStateOf<List<ProductUnit>>(emptyList()) }
+    var selectedUnitIndex by remember { mutableIntStateOf(0) }
+    var inputQuantity by remember { mutableStateOf("1") }
+
+    // Completed Invoice Dialog
+    var completedInvoice by remember { mutableStateOf<InvoiceEntity?>(null) }
+    var completedInvoiceItems by remember { mutableStateOf<List<InvoiceItem>>(emptyList()) }
+
+    // Calculations
+    val subtotal = remember(cartItems) { cartItems.sumOf { it.total } }
+    val discountVal = discountInput.toDoubleOrNull() ?: 0.0
+    val totalAmount = (subtotal - discountVal).coerceAtLeast(0.0)
+    val paidAmountVal = if (paymentMethod == "CASH") totalAmount else (paidAmountInput.toDoubleOrNull() ?: 0.0)
+    val remainingAmount = (totalAmount - paidAmountVal).coerceAtLeast(0.0)
+
+    val previousCustomerBalance = selectedCustomer?.currentBalance ?: 0.0
+    val newCustomerBalance = if (paymentMethod == "CREDIT") previousCustomerBalance + remainingAmount else previousCustomerBalance
+
+    // Filter products for top quick bar
+    var productSearchQuery by remember { mutableStateOf("") }
+    val filteredProducts = remember(products, productSearchQuery) {
+        val q = productSearchQuery.trim().lowercase()
+        if (q.isEmpty()) products
+        else products.filter { it.name.lowercase().contains(q) || it.code.contains(q) || it.barcode.contains(q) }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "إدارة الأصناف والمخزون",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Black,
-                            color = Color.White
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("نقطة البيع (الكاشير)", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White)
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(Color.White.copy(alpha = 0.2f))
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
-                            Text(
-                                text = "${products.size} صنف",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
+                            Text("${cartItems.size} صنف بالسلة", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowForward,
-                            contentDescription = "الرجوع للرئيسية",
-                            tint = Color.White
-                        )
+                        Icon(Icons.Default.ArrowForward, contentDescription = "رجوع", tint = Color.White)
                     }
                 },
                 actions = {
-                    Button(
-                        onClick = {
-                            editingProduct = null
-                            isModalOpen = true
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "إضافة صنف",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Black,
-                            color = Color.White
-                        )
+                    if (cartItems.isNotEmpty()) {
+                        IconButton(onClick = { cartItems = emptyList() }) {
+                            Icon(Icons.Default.DeleteSweep, contentDescription = "تفريغ السلة", tint = Color(0xFFFECDD3))
+                        }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF0F766E)
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F766E))
             )
         },
         containerColor = Color(0xFFF1F5F9)
@@ -148,964 +134,639 @@ fun ProductsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            // View Mode Switcher + Add Button Row (Matching Screenshot)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Add Product Button (Left)
-                Button(
-                    onClick = {
-                        editingProduct = null
-                        isModalOpen = true
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "اضافه صنف",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White
-                    )
-                }
-
-                // View Mode buttons: Grid / Strip / Table (Right)
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFFE2E8F0))
-                        .padding(3.dp),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    // Grid Mode
-                    Surface(
-                        onClick = { viewMode = ProductViewMode.GRID },
-                        shape = RoundedCornerShape(10.dp),
-                        color = if (viewMode == ProductViewMode.GRID) Color.White else Color.Transparent,
-                        shadowElevation = if (viewMode == ProductViewMode.GRID) 2.dp else 0.dp
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.GridView,
-                                contentDescription = null,
-                                tint = if (viewMode == ProductViewMode.GRID) Color(0xFF0F172A) else Color(0xFF64748B),
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Text(
-                                text = "شبكة",
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.Black,
-                                color = if (viewMode == ProductViewMode.GRID) Color(0xFF0F172A) else Color(0xFF64748B)
-                            )
-                        }
-                    }
-
-                    // Strip Mode
-                    Surface(
-                        onClick = { viewMode = ProductViewMode.STRIP },
-                        shape = RoundedCornerShape(10.dp),
-                        color = if (viewMode == ProductViewMode.STRIP) Color.White else Color.Transparent,
-                        shadowElevation = if (viewMode == ProductViewMode.STRIP) 2.dp else 0.dp
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ChevronLeft,
-                                contentDescription = null,
-                                tint = if (viewMode == ProductViewMode.STRIP) Color(0xFF0F172A) else Color(0xFF64748B),
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Text(
-                                text = "شريط",
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.Black,
-                                color = if (viewMode == ProductViewMode.STRIP) Color(0xFF0F172A) else Color(0xFF64748B)
-                            )
-                        }
-                    }
-
-                    // Table Mode
-                    Surface(
-                        onClick = { viewMode = ProductViewMode.TABLE },
-                        shape = RoundedCornerShape(10.dp),
-                        color = if (viewMode == ProductViewMode.TABLE) Color.White else Color.Transparent,
-                        shadowElevation = if (viewMode == ProductViewMode.TABLE) 2.dp else 0.dp
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.List,
-                                contentDescription = null,
-                                tint = if (viewMode == ProductViewMode.TABLE) Color(0xFF0F172A) else Color(0xFF64748B),
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Text(
-                                text = "قائمة",
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.Black,
-                                color = if (viewMode == ProductViewMode.TABLE) Color(0xFF0F172A) else Color(0xFF64748B)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Search Bar (Matching Screenshot)
-            OutlinedTextField(
-                value = searchTerm,
-                onValueChange = { searchTerm = it },
-                placeholder = {
-                    Text(
-                        "ابحث بالاسم أو الباركود لعرض وتصفية الأصناف فوراً...",
-                        fontSize = 11.5.sp,
-                        color = Color(0xFF94A3B8)
-                    )
-                },
-                singleLine = true,
-                leadingIcon = {
-                    Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF0F766E), modifier = Modifier.size(18.dp))
-                },
-                trailingIcon = {
-                    if (searchTerm.isNotEmpty()) {
-                        IconButton(onClick = { searchTerm = "" }) {
-                            Icon(Icons.Default.Clear, contentDescription = null, tint = Color(0xFF64748B), modifier = Modifier.size(16.dp))
-                        }
-                    }
-                },
-                shape = RoundedCornerShape(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    focusedBorderColor = Color(0xFF0F766E),
-                    unfocusedBorderColor = Color(0xFFCBD5E1)
-                ),
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            // Total Count Indicator (إجمالي الأصناف: 4)
-            Text(
-                text = "إجمالي الأصناف: ${filteredProducts.size}",
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.Black,
-                color = Color(0xFF0F766E),
-                modifier = Modifier.padding(horizontal = 4.dp)
-            )
-
-            // Content Views
-            if (filteredProducts.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color.White)
-                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(20.dp))
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Inventory2,
-                            contentDescription = null,
-                            tint = Color(0xFF94A3B8),
-                            modifier = Modifier.size(48.dp)
-                        )
-                        Text(
-                            text = if (searchTerm.isNotEmpty()) "لا توجد أصناف مطابقة لبحثك" else "لا توجد أي أصناف مسجلة حتى الآن",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF64748B)
-                        )
-                    }
-                }
-            } else {
-                when (viewMode) {
-                    ProductViewMode.GRID -> {
-                        LazyVerticalGrid(
-                            columns = GridCells.Fixed(2),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            items(filteredProducts, key = { it.id }) { product ->
-                                ProductGridCard(
-                                    product = product,
-                                    currency = settings.currencyName,
-                                    onEdit = {
-                                        editingProduct = product
-                                        isModalOpen = true
-                                    },
-                                    onDelete = {
-                                        productToDelete = product
-                                    }
-                                )
-                            }
-                        }
-                    }
-                    ProductViewMode.STRIP -> {
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            items(filteredProducts, key = { it.id }) { product ->
-                                ProductStripCard(
-                                    product = product,
-                                    currency = settings.currencyName,
-                                    onEdit = {
-                                        editingProduct = product
-                                        isModalOpen = true
-                                    },
-                                    onDelete = {
-                                        productToDelete = product
-                                    }
-                                )
-                            }
-                        }
-                    }
-                    ProductViewMode.TABLE -> {
-                        ProductTableCard(
-                            products = filteredProducts,
-                            currency = settings.currencyName,
-                            onEdit = { product ->
-                                editingProduct = product
-                                isModalOpen = true
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    // Modal: Add / Edit Product
-    if (isModalOpen) {
-        ProductFormDialog(
-            existingProduct = editingProduct,
-            existingProductsCount = products.size,
-            currency = settings.currencyName,
-            onDismiss = { isModalOpen = false },
-            onSave = { savedEntity ->
-                onSaveProduct(savedEntity)
-                isModalOpen = false
-            }
-        )
-    }
-
-    // Delete Confirmation Dialog
-    productToDelete?.let { prod ->
-        AlertDialog(
-            onDismissRequest = { productToDelete = null },
-            title = { Text("حذف الصنف", fontWeight = FontWeight.Black, fontSize = 16.sp) },
-            text = {
-                Text(
-                    "هل أنت متأكد من حذف الصنف (${prod.name})؟ سيتم إزالته من قائمة الأصناف.",
-                    fontSize = 13.sp
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        onDeleteProduct(prod)
-                        productToDelete = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
-                ) {
-                    Text("نعم، حذف", fontWeight = FontWeight.Bold, color = Color.White)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { productToDelete = null }) {
-                    Text("إلغاء", fontWeight = FontWeight.Bold, color = Color(0xFF64748B))
-                }
-            }
-        )
-    }
-}
-
-// -------------------------------------------------------------
-// Component: Product Grid Card (مطابق لصورة الشاشة تماماً)
-// -------------------------------------------------------------
-@Composable
-fun ProductGridCard(
-    product: ProductEntity,
-    currency: String,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onEdit() },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFFE2E8F0)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
                 .padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Top Row: Edit Button (Left) + Product Name (Right)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Edit Circular Button
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFF1F5F9))
-                        .border(0.8.dp, Color(0xFFE2E8F0), CircleShape)
-                        .clickable { onEdit() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "تعديل",
-                        tint = Color(0xFF64748B),
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
-
-                // Product Name
-                Text(
-                    text = product.name,
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color(0xFF0F172A),
-                    textAlign = TextAlign.End,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false).padding(start = 6.dp)
-                )
-            }
-
-            // Bottom Box: Available Quantity Green Banner
-            Row(
+            // 1. Customer Selection Card
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFFECFDF5))
-                    .border(0.8.dp, Color(0xFFA7F3D0), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 8.dp, vertical = 5.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .clickable { showCustomerSearchDialog = true },
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
-                    Text(
-                        text = "${product.stockQuantity.toInt()}",
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color(0xFF064E3B)
-                    )
-                    Text(
-                        text = product.baseUnitName.ifEmpty { "صفحه" },
-                        fontSize = 9.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF047857)
-                    )
-                }
-
-                Text(
-                    text = "الكمية المتوفرة",
-                    fontSize = 9.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF065F46)
-                )
-            }
-        }
-    }
-}
-
-// -------------------------------------------------------------
-// Component: Product Strip Card
-// -------------------------------------------------------------
-@Composable
-fun ProductStripCard(
-    product: ProductEntity,
-    currency: String,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onEdit() },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = product.name,
-                    fontSize = 13.5.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color(0xFF0F172A),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "سعر البيع: ${product.salePrice.toInt()} $currency",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF0F766E)
-                )
-            }
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFFECFDF5))
-                        .border(1.dp, Color(0xFFA7F3D0), RoundedCornerShape(10.dp))
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = "${product.stockQuantity.toInt()} ${product.baseUnitName}",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color(0xFF065F46)
-                    )
-                }
-
-                IconButton(
-                    onClick = onEdit,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFFF1F5F9))
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "تعديل",
-                        tint = Color(0xFF0F766E),
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-// -------------------------------------------------------------
-// Component: Product Table Card
-// -------------------------------------------------------------
-@Composable
-fun ProductTableCard(
-    products: List<ProductEntity>,
-    currency: String,
-    onEdit: (ProductEntity) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Header Row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFFF8FAFC))
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "اسم الصنف",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color(0xFF475569),
-                    modifier = Modifier.weight(2f)
-                )
-                Text(
-                    text = "سعر البيع",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color(0xFF475569),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = "الكمية",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color(0xFF475569),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = "إجراء",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color(0xFF475569),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.width(40.dp)
-                )
-            }
-
-            HorizontalDivider(color = Color(0xFFE2E8F0))
-
-            // Body List
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(products, key = { it.id }) { product ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onEdit(product) }
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = product.name,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Black,
-                            color = Color(0xFF0F172A),
-                            modifier = Modifier.weight(2f)
-                        )
-                        Text(
-                            text = "${product.salePrice.toInt()} $currency",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0F766E),
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Text(
-                            text = "${product.stockQuantity.toInt()} ${product.baseUnitName}",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Black,
-                            color = Color(0xFF059669),
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton(
-                            onClick = { onEdit(product) },
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFFF1F5F9))
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = "تعديل",
-                                tint = Color(0xFF0F766E),
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                    }
-                    HorizontalDivider(color = Color(0xFFF1F5F9))
-                }
-            }
-        }
-    }
-}
-
-// -------------------------------------------------------------
-// Component: Dialog for Adding / Editing Product
-// -------------------------------------------------------------
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ProductFormDialog(
-    existingProduct: ProductEntity?,
-    existingProductsCount: Int,
-    currency: String,
-    onDismiss: () -> Unit,
-    onSave: (ProductEntity) -> Unit
-) {
-    var name by remember { mutableStateOf(existingProduct?.name ?: "") }
-    var barcode by remember {
-        mutableStateOf(existingProduct?.barcode ?: "6281000${(existingProductsCount + 1).toString().padStart(3, '0')}")
-    }
-    var code by remember {
-        mutableStateOf(existingProduct?.code ?: "${1000 + existingProductsCount + 1}")
-    }
-
-    // Units and prices matching current system exactly
-    var mainUnitName by remember { mutableStateOf(existingProduct?.baseUnitName ?: "كرت") }
-    var mainUnitPrice by remember {
-        mutableStateOf(if (existingProduct != null && existingProduct.salePrice > 0) existingProduct.salePrice.toInt().toString() else "")
-    }
-
-    var subUnitName by remember { mutableStateOf("صفحه") }
-    var subUnitFactor by remember { mutableStateOf("24") }
-    var subUnitPrice by remember { mutableStateOf("") }
-
-    var stockQuantity by remember {
-        mutableStateOf(if (existingProduct != null) existingProduct.stockQuantity.toInt().toString() else "100")
-    }
-
-    var errorMessage by remember { mutableStateOf("") }
-    val focusManager = LocalFocusManager.current
-
-    // Initialize units if editing
-    LaunchedEffect(existingProduct) {
-        if (existingProduct != null && existingProduct.unitsJson.isNotEmpty()) {
-            try {
-                val listType = object : TypeToken<List<ProductUnit>>() {}.type
-                val units: List<ProductUnit> = Gson().fromJson(existingProduct.unitsJson, listType) ?: emptyList()
-                val sub = units.firstOrNull { it.factor > 1.0 }
-                if (sub != null) {
-                    subUnitName = sub.name
-                    subUnitFactor = sub.factor.toInt().toString()
-                    subUnitPrice = sub.salePrice.toInt().toString()
-                }
-            } catch (_: Exception) {}
-        }
-    }
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth(0.94f)
-                .widthIn(max = 500.dp)
-                .wrapContentHeight()
-                .padding(vertical = 16.dp),
-            shape = RoundedCornerShape(26.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                // Header
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
+                        .fillMaxWidth()
+                        .padding(12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Box(
                             modifier = Modifier
                                 .size(38.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFF0F766E)),
+                                .clip(CircleShape)
+                                .background(Color(0xFFE0F2FE)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = if (existingProduct == null) Icons.Default.AddBox else Icons.Default.Edit,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
+                            Icon(Icons.Default.Person, contentDescription = null, tint = Color(0xFF0284C7), modifier = Modifier.size(22.dp))
                         }
                         Column {
                             Text(
-                                text = if (existingProduct == null) "إضافة صنف جديد" else "تعديل بيانات الصنف",
-                                fontSize = 15.sp,
+                                text = selectedCustomer?.name ?: "انقر لاختيار العميل (مطلوب للآجل)",
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.Black,
-                                color = Color(0xFF0F172A)
+                                color = if (selectedCustomer != null) Color(0xFF0F172A) else Color(0xFF64748B)
                             )
+                            if (selectedCustomer != null) {
+                                Text(
+                                    text = "الرصيد السابق: ${selectedCustomer!!.currentBalance.toInt()} ${settings.currencyName}",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (selectedCustomer!!.currentBalance > 0) Color(0xFFDC2626) else Color(0xFF059669)
+                                )
+                            }
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = { showCustomerSearchDialog = true },
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(if (selectedCustomer == null) "اختيار عميل" else "تغيير", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            // 2. Quick Products Horizontal Bar
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedTextField(
+                    value = productSearchQuery,
+                    onValueChange = { productSearchQuery = it },
+                    placeholder = { Text("🔍 بحث سريع عن صنف لإضافته...", fontSize = 11.5.sp, color = Color(0xFF94A3B8)) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White,
+                        focusedBorderColor = Color(0xFF0F766E),
+                        unfocusedBorderColor = Color(0xFFCBD5E1)
+                    ),
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                )
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(filteredProducts, key = { it.id }) { prod ->
+                        Surface(
+                            onClick = {
+                                // Parse units for this product
+                                val listType = object : TypeToken<List<ProductUnit>>() {}.type
+                                val units: List<ProductUnit> = try {
+                                    Gson().fromJson(prod.unitsJson, listType) ?: emptyList()
+                                } catch (_: Exception) { emptyList() }
+
+                                val finalUnits = units.ifEmpty {
+                                    listOf(
+                                        ProductUnit(
+                                            id = "default",
+                                            name = prod.baseUnitName,
+                                            factor = 1.0,
+                                            purchasePrice = prod.purchasePrice,
+                                            salePrice = prod.salePrice,
+                                            isDefault = true
+                                        )
+                                    )
+                                }
+                                selectedProductUnits = finalUnits
+                                selectedUnitIndex = 0
+                                inputQuantity = "1"
+                                selectedProductForCart = prod
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color.White,
+                            shadowElevation = 2.dp,
+                            modifier = Modifier.width(130.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = prod.name,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Black,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "${prod.salePrice.toInt()} ${settings.currencyName}",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color(0xFF0F766E)
+                                    )
+                                    Text(
+                                        text = "${prod.stockQuantity.toInt()}",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF64748B)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. Cart Items Table
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                if (cartItems.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = Color(0xFFCBD5E1), modifier = Modifier.size(42.dp))
+                            Text("السلة فارغة، اختر أصناف لإضافتها للفاتورة", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF94A3B8))
+                        }
+                    }
+                } else {
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        item {
+                            // Table Header
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color(0xFFF8FAFC))
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("الصنف والوحدة", fontSize = 11.sp, fontWeight = FontWeight.Black, color = Color(0xFF475569), modifier = Modifier.weight(2f))
+                                Text("الكمية", fontSize = 11.sp, fontWeight = FontWeight.Black, color = Color(0xFF475569), textAlign = TextAlign.Center, modifier = Modifier.weight(1.2f))
+                                Text("السعر", fontSize = 11.sp, fontWeight = FontWeight.Black, color = Color(0xFF475569), textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+                                Text("الإجمالي", fontSize = 11.sp, fontWeight = FontWeight.Black, color = Color(0xFF475569), textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+                                Spacer(modifier = Modifier.width(28.dp))
+                            }
+                            HorizontalDivider(color = Color(0xFFE2E8F0))
+                        }
+
+                        itemsIndexed(cartItems) { index, item ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(2f)) {
+                                    Text(item.productName, fontSize = 12.sp, fontWeight = FontWeight.Black, maxLines = 1)
+                                    Text("${item.unitName} × ${item.unitPrice.toInt()}", fontSize = 10.sp, color = Color(0xFF64748B))
+                                }
+
+                                // Quantity Stepper
+                                Row(
+                                    modifier = Modifier.weight(1.2f),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    IconButton(
+                                        onClick = {
+                                            if (item.quantity > 1) {
+                                                val updated = cartItems.toMutableList()
+                                                val newQty = item.quantity - 1
+                                                updated[index] = item.copy(quantity = newQty, total = newQty * item.unitPrice)
+                                                cartItems = updated
+                                            } else {
+                                                cartItems = cartItems.filterIndexed { i, _ -> i != index }
+                                            }
+                                        },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(Icons.Default.Remove, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    }
+
+                                    Text("${item.quantity.toInt()}", fontSize = 12.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(horizontal = 4.dp))
+
+                                    IconButton(
+                                        onClick = {
+                                            val updated = cartItems.toMutableList()
+                                            val newQty = item.quantity + 1
+                                            updated[index] = item.copy(quantity = newQty, total = newQty * item.unitPrice)
+                                            cartItems = updated
+                                        },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    }
+                                }
+
+                                Text("${item.unitPrice.toInt()}", fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+                                Text("${item.total.toInt()}", fontSize = 11.5.sp, fontWeight = FontWeight.Black, color = Color(0xFF0F766E), textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+
+                                IconButton(
+                                    onClick = { cartItems = cartItems.filterIndexed { i, _ -> i != index } },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "حذف", tint = Color(0xFFEF4444), modifier = Modifier.size(16.dp))
+                                }
+                            }
+                            HorizontalDivider(color = Color(0xFFF8FAFC))
+                        }
+                    }
+                }
+            }
+
+            // 4. Payment & Totals Summary Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Payment Method Toggle (نقدي / آجل)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFFF1F5F9))
+                            .padding(3.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Surface(
+                            onClick = { paymentMethod = "CREDIT" },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (paymentMethod == "CREDIT") Color(0xFFDC2626) else Color.Transparent
+                        ) {
                             Text(
-                                text = "جدول الأصناف (ias_itm)",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF64748B)
+                                "🔴 فاتورة آجلة (دين)",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Black,
+                                color = if (paymentMethod == "CREDIT") Color.White else Color(0xFF475569),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+
+                        Surface(
+                            onClick = { paymentMethod = "CASH" },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (paymentMethod == "CASH") Color(0xFF059669) else Color.Transparent
+                        ) {
+                            Text(
+                                "🟢 فاتورة نقدية (كاش)",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Black,
+                                color = if (paymentMethod == "CASH") Color.White else Color(0xFF475569),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 8.dp)
                             )
                         }
                     }
 
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color(0xFF64748B))
+                    // Cash paid row if CREDIT
+                    if (paymentMethod == "CREDIT") {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = paidAmountInput,
+                                onValueChange = { paidAmountInput = it },
+                                label = { Text("المدفوع نقداً مقدم", fontSize = 10.sp) },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f).height(48.dp)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("المتبقي آجل:", fontSize = 10.sp, color = Color(0xFF64748B), fontWeight = FontWeight.Bold)
+                                Text("${remainingAmount.toInt()} ${settings.currencyName}", fontSize = 13.sp, fontWeight = FontWeight.Black, color = Color(0xFFDC2626))
+                            }
+                        }
+                    }
+
+                    // Total & Save Button Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("إجمالي الفاتورة:", fontSize = 11.sp, color = Color(0xFF64748B), fontWeight = FontWeight.Bold)
+                            Text(
+                                "${totalAmount.toInt()} ${settings.currencyName}",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFF0F766E)
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                if (cartItems.isEmpty()) {
+                                    Toast.makeText(context, "يرجى إضافة أصناف أولاً للسلة", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                if (paymentMethod == "CREDIT" && selectedCustomer == null) {
+                                    Toast.makeText(context, "⚠️ يجب اختيار العميل للفاتورة الآجلة!", Toast.LENGTH_LONG).show()
+                                    showCustomerSearchDialog = true
+                                    return@Button
+                                }
+
+                                val customerObj = selectedCustomer ?: CustomerEntity(
+                                    id = "cash-cust",
+                                    code = "1001",
+                                    name = "عميل نقدي عام",
+                                    currentBalance = 0.0
+                                )
+
+                                val invoiceNumber = "INV-${System.currentTimeMillis().toString().takeLast(6)}"
+                                val newInvoice = InvoiceEntity(
+                                    id = UUID.randomUUID().toString(),
+                                    invoiceNumber = invoiceNumber,
+                                    billNo = (System.currentTimeMillis() % 100000).toString(),
+                                    billType = if (paymentMethod == "CREDIT") 4 else 1,
+                                    paymentMethod = paymentMethod,
+                                    customerId = customerObj.id,
+                                    customerCode = customerObj.code,
+                                    customerName = customerObj.name,
+                                    date = System.currentTimeMillis(),
+                                    subtotal = subtotal,
+                                    discount = discountVal,
+                                    total = totalAmount,
+                                    paidAmount = paidAmountVal,
+                                    remainingAmount = remainingAmount,
+                                    previousCustomerBalance = previousCustomerBalance,
+                                    newCustomerBalance = newCustomerBalance,
+                                    itemsJson = Gson().toJson(cartItems),
+                                    notes = notes,
+                                    createdBy = currentUserName
+                                )
+
+                                onSaveInvoice(newInvoice, cartItems)
+                                completedInvoice = newInvoice
+                                completedInvoiceItems = cartItems
+                                cartItems = emptyList()
+                            },
+                            modifier = Modifier.height(48.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E))
+                        ) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("حفظ وطباعة الفاتورة", fontSize = 13.sp, fontWeight = FontWeight.Black)
+                        }
                     }
                 }
+            }
+        }
+    }
 
-                HorizontalDivider(color = Color(0xFFE2E8F0))
-
-                // Error alert
-                AnimatedVisibility(visible = errorMessage.isNotEmpty()) {
-                    Text(
-                        text = errorMessage,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFDC2626),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0xFFFEF2F2))
-                            .padding(8.dp)
-                    )
-                }
-
-                // 1. Product Name
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("اسم الصنف *", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
-                    placeholder = { Text("مثال: كرت شحن 1000 ريال", fontSize = 12.sp) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF0F766E),
-                        focusedLabelColor = Color(0xFF0F766E)
-                    )
-                )
-
-                // 2. Barcode & Code
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedTextField(
-                        value = barcode,
-                        onValueChange = { barcode = it },
-                        label = { Text("الباركود", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(14.dp)
-                    )
-                    OutlinedTextField(
-                        value = code,
-                        onValueChange = { code = it },
-                        label = { Text("كود الصنف", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(14.dp)
-                    )
-                }
-
-                // 3. Main Unit (الوحدة الرئيسية)
+    // Modal: Product Unit & Quantity Selector
+    selectedProductForCart?.let { prod ->
+        Dialog(onDismissRequest = { selectedProductForCart = null }) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth(0.92f)
+                    .padding(16.dp),
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White)
+            ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFFF8FAFC))
-                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(14.dp))
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = "1. الوحدة الرئيسية (الأساسية):",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color(0xFF0F766E)
-                    )
+                    Text(prod.name, fontSize = 15.sp, fontWeight = FontWeight.Black, color = Color(0xFF0F172A))
+
+                    Text("اختر الوحدة وسعر البيع:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF64748B))
+
+                    // Unit Selection Chips
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        OutlinedTextField(
-                            value = mainUnitName,
-                            onValueChange = { mainUnitName = it },
-                            label = { Text("اسم الوحدة", fontSize = 11.sp) },
-                            placeholder = { Text("كرت", fontSize = 11.sp) },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp)
-                        )
-                        OutlinedTextField(
-                            value = mainUnitPrice,
-                            onValueChange = { mainUnitPrice = it },
-                            label = { Text("سعر البيع ($currency)", fontSize = 11.sp) },
-                            placeholder = { Text("1000", fontSize = 11.sp) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp)
-                        )
+                        selectedProductUnits.forEachIndexed { index, unit ->
+                            Surface(
+                                onClick = { selectedUnitIndex = index },
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (selectedUnitIndex == index) Color(0xFF0F766E) else Color(0xFFF1F5F9),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(8.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        unit.name,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = if (selectedUnitIndex == index) Color.White else Color(0xFF0F172A)
+                                    )
+                                    Text(
+                                        "${unit.salePrice.toInt()} ${settings.currencyName}",
+                                        fontSize = 10.sp,
+                                        color = if (selectedUnitIndex == index) Color(0xFFCCFBF1) else Color(0xFF64748B)
+                                    )
+                                }
+                            }
+                        }
                     }
-                }
 
-                // 4. Sub Unit (الوحدة الفرعية - اختياري)
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFFF8FAFC))
-                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(14.dp))
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "2. الوحدة الفرعية (تجزئة اختيارية):",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color(0xFF475569)
+                    // Quantity Input
+                    OutlinedTextField(
+                        value = inputQuantity,
+                        onValueChange = { inputQuantity = it },
+                        label = { Text("الكمية المطلوبة", fontSize = 11.sp) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = subUnitName,
-                            onValueChange = { subUnitName = it },
-                            label = { Text("اسم الوحدة", fontSize = 11.sp) },
-                            placeholder = { Text("صفحه / حبة", fontSize = 11.sp) },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp)
-                        )
-                        OutlinedTextField(
-                            value = subUnitFactor,
-                            onValueChange = { subUnitFactor = it },
-                            label = { Text("عدد الوحدات", fontSize = 11.sp) },
-                            placeholder = { Text("24", fontSize = 11.sp) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp)
-                        )
-                        OutlinedTextField(
-                            value = subUnitPrice,
-                            onValueChange = { subUnitPrice = it },
-                            label = { Text("سعر البيع", fontSize = 11.sp) },
-                            placeholder = { Text("50", fontSize = 11.sp) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp)
-                        )
-                    }
-                }
 
-                // 5. Stock Quantity
-                OutlinedTextField(
-                    value = stockQuantity,
-                    onValueChange = { stockQuantity = it },
-                    label = { Text("كمية المخزون الافتتاحية ($mainUnitName)", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
-                    placeholder = { Text("100", fontSize = 12.sp) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp)
-                )
-
-                // Actions: Save / Cancel
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
+                    // Add to Cart Button
                     Button(
                         onClick = {
-                            val trimmedName = name.trim()
-                            if (trimmedName.isEmpty()) {
-                                errorMessage = "يرجى كتابة اسم الصنف"
-                                return@Button
-                            }
-                            val priceVal = mainUnitPrice.toDoubleOrNull() ?: 0.0
-                            val stockVal = stockQuantity.toDoubleOrNull() ?: 0.0
-
-                            // Build Units JSON
-                            val unitsList = mutableListOf<ProductUnit>()
-                            unitsList.add(
-                                ProductUnit(
-                                    id = "unit-1",
-                                    name = mainUnitName.ifEmpty { "كرت" },
-                                    factor = 1.0,
-                                    purchasePrice = 0.0,
-                                    salePrice = priceVal,
-                                    isDefault = true
-                                )
+                            val qty = inputQuantity.toDoubleOrNull() ?: 1.0
+                            val selectedUnit = selectedProductUnits.getOrNull(selectedUnitIndex) ?: selectedProductUnits.first()
+                            val newItem = InvoiceItem(
+                                id = UUID.randomUUID().toString(),
+                                productId = prod.id,
+                                productCode = prod.code,
+                                productName = prod.name,
+                                unitId = selectedUnit.id,
+                                unitName = selectedUnit.name,
+                                unitFactor = selectedUnit.factor,
+                                quantity = qty,
+                                unitPrice = selectedUnit.salePrice,
+                                costPrice = prod.purchasePrice,
+                                total = qty * selectedUnit.salePrice
                             )
-                            if (subUnitName.isNotBlank() && (subUnitFactor.toDoubleOrNull() ?: 0.0) > 1.0) {
-                                unitsList.add(
-                                    ProductUnit(
-                                        id = "unit-2",
-                                        name = subUnitName.trim(),
-                                        factor = subUnitFactor.toDoubleOrNull() ?: 1.0,
-                                        purchasePrice = 0.0,
-                                        salePrice = subUnitPrice.toDoubleOrNull() ?: 0.0,
-                                        isDefault = false
-                                    )
-                                )
-                            }
-
-                            val newOrUpdatedProduct = ProductEntity(
-                                id = existingProduct?.id ?: UUID.randomUUID().toString(),
-                                code = code.ifEmpty { (1000 + existingProductsCount + 1).toString() },
-                                name = trimmedName,
-                                barcode = barcode.ifEmpty { code },
-                                salePrice = priceVal,
-                                purchasePrice = existingProduct?.purchasePrice ?: 0.0,
-                                stockQuantity = stockVal,
-                                baseUnitName = mainUnitName.ifEmpty { "كرت" },
-                                unitsJson = Gson().toJson(unitsList),
-                                createdAt = existingProduct?.createdAt ?: System.currentTimeMillis(),
-                                updatedAt = System.currentTimeMillis()
-                            )
-
-                            onSave(newOrUpdatedProduct)
+                            cartItems = cartItems + newItem
+                            selectedProductForCart = null
                         },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth().height(46.dp),
+                        shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E))
                     ) {
-                        Text(
-                            text = if (existingProduct == null) "حفظ وإضافة الصنف" else "حفظ التعديلات",
-                            fontWeight = FontWeight.Black,
-                            fontSize = 13.sp,
-                            color = Color.White
-                        )
+                        Text("إضافة للسلة", fontWeight = FontWeight.Black, fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+    }
+
+    // Modal: Customer Search Dialog
+    if (showCustomerSearchDialog) {
+        Dialog(onDismissRequest = { showCustomerSearchDialog = false }) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth(0.95f)
+                    .height(420.dp),
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White)
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("بحث واختيار عميل", fontSize = 15.sp, fontWeight = FontWeight.Black)
+
+                    OutlinedTextField(
+                        value = customerSearchQuery,
+                        onValueChange = { customerSearchQuery = it },
+                        placeholder = { Text("ابحث بالاسم أو رقم الهاتف...", fontSize = 12.sp) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    val filteredCusts = remember(customers, customerSearchQuery) {
+                        val q = customerSearchQuery.trim().lowercase()
+                        if (q.isEmpty()) customers
+                        else customers.filter { it.name.lowercase().contains(q) || it.phone.contains(q) || it.code.contains(q) }
+                    }
+
+                    LazyColumn(modifier = Modifier.weight(1f)) {
+                        items(filteredCusts) { cust ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        selectedCustomer = cust
+                                        showCustomerSearchDialog = false
+                                    }
+                                    .padding(vertical = 8.dp, horizontal = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(cust.name, fontSize = 13.sp, fontWeight = FontWeight.Black)
+                                    Text("كود: ${cust.code} • هاتف: ${cust.phone.ifEmpty { "لا يوجد" }}", fontSize = 10.sp, color = Color(0xFF64748B))
+                                }
+                                Text("${cust.currentBalance.toInt()} ${settings.currencyName}", fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color(0xFFDC2626))
+                            }
+                            HorizontalDivider(color = Color(0xFFF1F5F9))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Modal: Invoice Success & Print / WhatsApp Actions
+    completedInvoice?.let { inv ->
+        Dialog(onDismissRequest = { completedInvoice = null }) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth(0.95f)
+                    .padding(16.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White)
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(54.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFDCFCE7)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF16A34A), modifier = Modifier.size(32.dp))
+                    }
+
+                    Text("تم حفظ الفاتورة بنجاح!", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color(0xFF0F172A))
+                    Text("رقم الفاتورة: #${inv.billNo.ifEmpty { inv.invoiceNumber }}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF64748B))
+
+                    // Instant Direct Bluetooth Thermal Print
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                val paired = printerManager.getPairedPrinters()
+                                if (paired.isNotEmpty()) {
+                                    val targetDevice = paired.first()
+                                    val result = printerManager.printInvoiceSilent(targetDevice.address, inv, settings)
+                                    if (result.isSuccess) {
+                                        Toast.makeText(context, "✅ تمت الطباعة الحرارية بنجاح", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(context, "خطأ في الطباعة: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                                    }
+                                } else {
+                                    Toast.makeText(context, "لا توجد طابعة بلوتوث مقترنة بالهاتف", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E))
+                    ) {
+                        Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("طباعة حرارية فورية (بلوتوث)", fontWeight = FontWeight.Black, fontSize = 13.sp)
+                    }
+
+                    // Share PDF to WhatsApp
+                    Button(
+                        onClick = {
+                            PdfThermalGenerator.shareInvoiceToWhatsApp(context, inv, settings)
+                        },
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366))
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.White)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("إرسال PDF للواتساب", fontWeight = FontWeight.Black, fontSize = 13.sp, color = Color.White)
                     }
 
                     OutlinedButton(
-                        onClick = onDismiss,
-                        modifier = Modifier
-                            .weight(0.5f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(14.dp)
+                        onClick = { completedInvoice = null },
+                        modifier = Modifier.fillMaxWidth().height(44.dp),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("إلغاء", fontWeight = FontWeight.Bold, color = Color(0xFF64748B), fontSize = 13.sp)
+                        Text("إغلاق والعودة لنقطة البيع", fontWeight = FontWeight.Bold, color = Color(0xFF64748B))
                     }
                 }
             }
