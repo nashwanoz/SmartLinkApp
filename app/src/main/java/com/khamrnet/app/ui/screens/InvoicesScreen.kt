@@ -49,19 +49,18 @@ fun InvoicesScreen(
     var selectedInvoiceForDetails by remember { mutableStateOf<InvoiceEntity?>(null) }
     var invoiceToCancel by remember { mutableStateOf<InvoiceEntity?>(null) }
 
+    // Take only the last 5 invoices
     val filteredInvoices = remember(invoices, searchTerm) {
+        val sorted = invoices.sortedByDescending { it.date }
         val s = searchTerm.trim().lowercase()
-        if (s.isEmpty()) invoices
-        else invoices.filter {
+        if (s.isEmpty()) sorted.take(5)
+        else sorted.filter {
             it.invoiceNumber.lowercase().contains(s) ||
             it.billNo.contains(s) ||
             it.customerName.lowercase().contains(s) ||
             it.customerCode.contains(s)
-        }
+        }.take(5)
     }
-
-    val totalSales = remember(invoices) { invoices.sumOf { it.total } }
-    val totalRemaining = remember(invoices) { invoices.sumOf { it.remainingAmount } }
 
     Scaffold(
         topBar = {
@@ -69,14 +68,6 @@ fun InvoicesScreen(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("سجل الفواتير", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White)
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color.White.copy(alpha = 0.2f))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text("${invoices.size} فاتورة", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
                     }
                 },
                 navigationIcon = {
@@ -87,7 +78,7 @@ fun InvoicesScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F766E))
             )
         },
-        containerColor = Color(0xFFF1F5F9)
+        containerColor = Color(0xFFF8FAFC)
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -96,29 +87,65 @@ fun InvoicesScreen(
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Summary Stats Row
+            // Subheader: Title "سجل الفواتير (آخر 5 فواتير حديثة)" & Button "+ اضافه فاتورة"
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Card(
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFECFDF5))
+                // Add Invoice Button (Left)
+                Button(
+                    onClick = { /* Add Invoice */ },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                 ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Text("إجمالي المبيعات", fontSize = 10.5.sp, color = Color(0xFF065F46), fontWeight = FontWeight.Bold)
-                        Text("${totalSales.toInt()} ${settings.currencyName}", fontSize = 14.sp, fontWeight = FontWeight.Black, color = Color(0xFF047857))
-                    }
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "اضافه فاتورة",
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White
+                    )
                 }
-                Card(
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF2F2))
+
+                // Title & Tag (Right)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Text("المتبقي آجل (دين)", fontSize = 10.5.sp, color = Color(0xFF991B1B), fontWeight = FontWeight.Bold)
-                        Text("${totalRemaining.toInt()} ${settings.currencyName}", fontSize = 14.sp, fontWeight = FontWeight.Black, color = Color(0xFFDC2626))
+                    Text(
+                        text = "(آخر 5 فواتير حديثة)",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF94A3B8)
+                    )
+                    Text(
+                        text = "سجل الفواتير",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color(0xFF0F172A)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFFECFDF5))
+                            .border(0.8.dp, Color(0xFFA7F3D0), RoundedCornerShape(8.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Receipt,
+                            contentDescription = null,
+                            tint = Color(0xFF059669),
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 }
             }
@@ -127,30 +154,50 @@ fun InvoicesScreen(
             OutlinedTextField(
                 value = searchTerm,
                 onValueChange = { searchTerm = it },
-                placeholder = { Text("🔍 ابحث برقم الفاتورة أو اسم العميل...", fontSize = 12.sp, color = Color(0xFF94A3B8)) },
+                placeholder = {
+                    Text(
+                        "ابحث عن الفواتير باسم العميل أو الكود...",
+                        fontSize = 10.5.sp,
+                        color = Color(0xFF94A3B8)
+                    )
+                },
                 singleLine = true,
-                shape = RoundedCornerShape(14.dp),
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = null,
+                        tint = Color(0xFF059669),
+                        modifier = Modifier.size(18.dp)
+                    )
+                },
+                trailingIcon = {
+                    if (searchTerm.isNotEmpty()) {
+                        IconButton(onClick = { searchTerm = "" }) {
+                            Icon(Icons.Default.Clear, contentDescription = null, tint = Color(0xFF64748B), modifier = Modifier.size(16.dp))
+                        }
+                    }
+                },
+                shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = Color.White,
                     unfocusedContainerColor = Color.White,
-                    focusedBorderColor = Color(0xFF0F766E),
+                    focusedBorderColor = Color(0xFF059669),
                     unfocusedBorderColor = Color(0xFFCBD5E1)
                 ),
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // Invoices List
+            // Invoices List (5 max)
             if (filteredInvoices.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f)
                         .clip(RoundedCornerShape(16.dp))
                         .background(Color.White)
                         .padding(32.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("لا توجد فواتير مسجلة", fontSize = 13.sp, color = Color(0xFF64748B), fontWeight = FontWeight.Bold)
+                    Text("لا توجد فواتير مسجلة", fontSize = 12.sp, color = Color(0xFF64748B), fontWeight = FontWeight.Bold)
                 }
             } else {
                 LazyColumn(
@@ -158,100 +205,151 @@ fun InvoicesScreen(
                     modifier = Modifier.weight(1f)
                 ) {
                     items(filteredInvoices, key = { it.id }) { inv ->
-                        val dateFormat = SimpleDateFormat("yyyy/MM/dd  hh:mm a", Locale("ar"))
+                        val dateFormat = SimpleDateFormat("dd/MM/yyyy, hh:mm:ss a", Locale.US)
                         val formattedDate = dateFormat.format(Date(inv.date))
-                        val isCredit = inv.billType == 4 || inv.paymentMethod == "CREDIT"
+                        val isCash = inv.billType == 1 || inv.paymentMethod == "CASH"
 
                         Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { selectedInvoiceForDetails = inv },
+                            modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(containerColor = Color.White),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                            border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFFE2E8F0))
                         ) {
-                            Row(
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
+                                // Top row: Total (left) & Code + Type + Customer (right)
                                 Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(42.dp)
-                                            .clip(CircleShape)
-                                            .background(if (isCredit) Color(0xFFFEF2F2) else Color(0xFFECFDF5)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = if (isCredit) Icons.Default.ReceiptLong else Icons.Default.Receipt,
-                                            contentDescription = null,
-                                            tint = if (isCredit) Color(0xFFDC2626) else Color(0xFF059669),
-                                            modifier = Modifier.size(22.dp)
-                                        )
-                                    }
+                                    Text(
+                                        text = "${settings.currencyName} ${inv.total.toInt()}",
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color(0xFF0F172A)
+                                    )
 
-                                    Column {
-                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            Text("#${inv.billNo.ifEmpty { inv.invoiceNumber }}", fontSize = 13.sp, fontWeight = FontWeight.Black, color = Color(0xFF0F172A))
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(4.dp))
-                                                    .background(if (isCredit) Color(0xFFFEE2E2) else Color(0xFFDCFCE7))
-                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                                            ) {
-                                                Text(if (isCredit) "آجل" else "نقدي", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = if (isCredit) Color(0xFF991B1B) else Color(0xFF15803D))
-                                            }
-                                        }
-                                        Text(inv.customerName, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF475569), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text(formattedDate, fontSize = 9.5.sp, color = Color(0xFF94A3B8))
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isCash) "نقدي" else "آجل",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = Color(0xFF059669)
+                                        )
+                                        Text(
+                                            text = inv.customerName.ifEmpty { "عميل نقدي" },
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF0F172A)
+                                        )
+                                        Text(
+                                            text = "#${inv.billNo.ifEmpty { inv.invoiceNumber }}",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = Color(0xFF0F172A)
+                                        )
                                     }
                                 }
 
+                                // Middle row: items count & date
                                 Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Text("${inv.total.toInt()} ${settings.currencyName}", fontSize = 13.5.sp, fontWeight = FontWeight.Black, color = Color(0xFF0F766E))
-                                        if (isCredit && inv.remainingAmount > 0) {
-                                            Text("متبقي: ${inv.remainingAmount.toInt()}", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFFDC2626))
+                                    Text(
+                                        text = "1 أصناف",
+                                        fontSize = 10.sp,
+                                        color = Color(0xFF94A3B8)
+                                    )
+                                    Text(
+                                        text = "التاريخ: $formattedDate",
+                                        fontSize = 10.sp,
+                                        color = Color(0xFF94A3B8)
+                                    )
+                                }
+
+                                Divider(color = Color(0xFFF1F5F9), thickness = 0.8.dp)
+
+                                // Bottom toolbar: Actions
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Left: واتساب, طباعة, مشاركة
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(Color(0xFF059669))
+                                                .clickable {
+                                                    PdfThermalGenerator.shareInvoiceToWhatsApp(context, inv, settings)
+                                                }
+                                                .padding(horizontal = 8.dp, vertical = 5.dp)
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                                Icon(Icons.Default.Chat, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                                                Text("واتساب", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                            }
+                                        }
+
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(Color(0xFF059669))
+                                                .clickable {
+                                                    coroutineScope.launch {
+                                                        val paired = printerManager.getPairedPrinters()
+                                                        if (paired.isNotEmpty()) {
+                                                            printerManager.printInvoiceSilent(paired.first().address, inv, settings)
+                                                        }
+                                                    }
+                                                }
+                                                .padding(horizontal = 8.dp, vertical = 5.dp)
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                                Icon(Icons.Default.Print, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                                                Text("طباعة", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                            }
+                                        }
+
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(Color(0xFF059669))
+                                                .clickable {
+                                                    PdfThermalGenerator.shareInvoicePdf(context, inv, settings)
+                                                }
+                                                .padding(horizontal = 8.dp, vertical = 5.dp)
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                                Icon(Icons.Default.Share, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                                                Text("مشاركة", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                            }
                                         }
                                     }
 
-                                    // Quick Print Button
-                                    IconButton(
-                                        onClick = {
-                                            coroutineScope.launch {
-                                                val paired = printerManager.getPairedPrinters()
-                                                if (paired.isNotEmpty()) {
-                                                    val res = printerManager.printInvoiceSilent(paired.first().address, inv, settings)
-                                                    if (res.isSuccess) Toast.makeText(context, "✅ تمت الطباعة الحرارية", Toast.LENGTH_SHORT).show()
-                                                    else Toast.makeText(context, "خطأ في الطباعة", Toast.LENGTH_SHORT).show()
-                                                } else {
-                                                    Toast.makeText(context, "لا توجد طابعة بلوتوث متصلة", Toast.LENGTH_SHORT).show()
-                                                }
-                                            }
-                                        },
-                                        modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFF1F5F9))
+                                    // Right: معاينة
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(Color(0xFFF1F5F9))
+                                            .clickable { selectedInvoiceForDetails = inv }
+                                            .padding(horizontal = 10.dp, vertical = 5.dp)
                                     ) {
-                                        Icon(Icons.Default.Print, contentDescription = "طباعة", tint = Color(0xFF0F766E), modifier = Modifier.size(16.dp))
-                                    }
-
-                                    // WhatsApp Share Button
-                                    IconButton(
-                                        onClick = {
-                                            PdfThermalGenerator.shareInvoiceToWhatsApp(context, inv, settings)
-                                        },
-                                        modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFDCFCE7))
-                                    ) {
-                                        Icon(Icons.Default.Share, contentDescription = "مشاركة", tint = Color(0xFF16A34A), modifier = Modifier.size(16.dp))
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                            Text("معاينة", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF475569))
+                                            Icon(Icons.Default.Visibility, contentDescription = null, tint = Color(0xFF64748B), modifier = Modifier.size(12.dp))
+                                        }
                                     }
                                 }
                             }
