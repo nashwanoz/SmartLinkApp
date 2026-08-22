@@ -147,8 +147,7 @@ fun MainHomeScreen(
             title = "توليد الكروت",
             icon = Icons.Default.Wifi,
             iconBgColor = Color(0xFFF0F9FF),
-            iconTintColor = Color(0xFF0284C7),
-            badge = "قريباً"
+            iconTintColor = Color(0xFF0284C7)
         ),
         AppMenuItem(
             id = "users",

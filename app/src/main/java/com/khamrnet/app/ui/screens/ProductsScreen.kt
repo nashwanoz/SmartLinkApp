@@ -151,13 +151,38 @@ fun ProductsScreen(
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // View Mode Switcher + Search Row
+            // View Mode Switcher + Add Button Row (Matching Screenshot)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // View Mode buttons: Grid / Strip / Table
+                // Add Product Button (Left)
+                Button(
+                    onClick = {
+                        editingProduct = null
+                        isModalOpen = true
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "اضافه صنف",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White
+                    )
+                }
+
+                // View Mode buttons: Grid / Strip / Table (Right)
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(14.dp))
@@ -173,19 +198,19 @@ fun ProductsScreen(
                         shadowElevation = if (viewMode == ProductViewMode.GRID) 2.dp else 0.dp
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.GridView,
                                 contentDescription = null,
                                 tint = if (viewMode == ProductViewMode.GRID) Color(0xFF0F172A) else Color(0xFF64748B),
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(13.dp)
                             )
                             Text(
                                 text = "شبكة",
-                                fontSize = 11.sp,
+                                fontSize = 10.5.sp,
                                 fontWeight = FontWeight.Black,
                                 color = if (viewMode == ProductViewMode.GRID) Color(0xFF0F172A) else Color(0xFF64748B)
                             )
@@ -200,19 +225,19 @@ fun ProductsScreen(
                         shadowElevation = if (viewMode == ProductViewMode.STRIP) 2.dp else 0.dp
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.ViewAgenda,
+                                imageVector = Icons.Default.ChevronLeft,
                                 contentDescription = null,
                                 tint = if (viewMode == ProductViewMode.STRIP) Color(0xFF0F172A) else Color(0xFF64748B),
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(13.dp)
                             )
                             Text(
                                 text = "شريط",
-                                fontSize = 11.sp,
+                                fontSize = 10.5.sp,
                                 fontWeight = FontWeight.Black,
                                 color = if (viewMode == ProductViewMode.STRIP) Color(0xFF0F172A) else Color(0xFF64748B)
                             )
@@ -227,51 +252,46 @@ fun ProductsScreen(
                         shadowElevation = if (viewMode == ProductViewMode.TABLE) 2.dp else 0.dp
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.List,
                                 contentDescription = null,
                                 tint = if (viewMode == ProductViewMode.TABLE) Color(0xFF0F172A) else Color(0xFF64748B),
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(13.dp)
                             )
                             Text(
                                 text = "قائمة",
-                                fontSize = 11.sp,
+                                fontSize = 10.5.sp,
                                 fontWeight = FontWeight.Black,
                                 color = if (viewMode == ProductViewMode.TABLE) Color(0xFF0F172A) else Color(0xFF64748B)
                             )
                         }
                     }
                 }
-
-                // Count Indicator
-                Text(
-                    text = "المعروض: ${filteredProducts.size}",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF0F766E)
-                )
             }
 
-            // Search Bar
+            // Search Bar (Matching Screenshot)
             OutlinedTextField(
                 value = searchTerm,
                 onValueChange = { searchTerm = it },
                 placeholder = {
                     Text(
-                        "🔍 ابحث بالاسم أو الباركود أو الكود...",
-                        fontSize = 12.sp,
+                        "ابحث بالاسم أو الباركود لعرض وتصفية الأصناف فوراً...",
+                        fontSize = 11.5.sp,
                         color = Color(0xFF94A3B8)
                     )
                 },
                 singleLine = true,
+                leadingIcon = {
+                    Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF0F766E), modifier = Modifier.size(18.dp))
+                },
                 trailingIcon = {
                     if (searchTerm.isNotEmpty()) {
                         IconButton(onClick = { searchTerm = "" }) {
-                            Icon(Icons.Default.Clear, contentDescription = null, tint = Color(0xFF64748B))
+                            Icon(Icons.Default.Clear, contentDescription = null, tint = Color(0xFF64748B), modifier = Modifier.size(16.dp))
                         }
                     }
                 },
@@ -283,6 +303,15 @@ fun ProductsScreen(
                     unfocusedBorderColor = Color(0xFFCBD5E1)
                 ),
                 modifier = Modifier.fillMaxWidth()
+            )
+
+            // Total Count Indicator (إجمالي الأصناف: 4)
+            Text(
+                text = "إجمالي الأصناف: ${filteredProducts.size}",
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Black,
+                color = Color(0xFF0F766E),
+                modifier = Modifier.padding(horizontal = 4.dp)
             )
 
             // Content Views
@@ -421,7 +450,7 @@ fun ProductsScreen(
 }
 
 // -------------------------------------------------------------
-// Component: Product Grid Card (مربع صغير يعرض اسم الصنف فقط مع زر التعديل)
+// Component: Product Grid Card (مطابق لصورة الشاشة تماماً)
 // -------------------------------------------------------------
 @Composable
 fun ProductGridCard(
@@ -433,48 +462,91 @@ fun ProductGridCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(90.dp)
             .clickable { onEdit() },
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFFE2E8F0)),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Box(
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(8.dp)
+                .fillMaxWidth()
+                .padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Edit Button at top corner
-            IconButton(
-                onClick = onEdit,
-                modifier = Modifier
-                    .size(24.dp)
-                    .align(Alignment.TopStart)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0xFFF0FDFA))
+            // Top Row: Edit Button (Left) + Product Name (Right)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = "تعديل",
-                    tint = Color(0xFF0F766E),
-                    modifier = Modifier.size(13.dp)
+                // Edit Circular Button
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF1F5F9))
+                        .border(0.8.dp, Color(0xFFE2E8F0), CircleShape)
+                        .clickable { onEdit() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "تعديل",
+                        tint = Color(0xFF64748B),
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+
+                // Product Name
+                Text(
+                    text = product.name,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFF0F172A),
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false).padding(start = 6.dp)
                 )
             }
 
-            // Product Name centered in the square
-            Text(
-                text = product.name,
-                fontSize = 12.5.sp,
-                fontWeight = FontWeight.Black,
-                color = Color(0xFF0F172A),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+            // Bottom Box: Available Quantity Green Banner
+            Row(
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(horizontal = 4.dp, vertical = 2.dp)
-            )
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFFECFDF5))
+                    .border(0.8.dp, Color(0xFFA7F3D0), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 8.dp, vertical = 5.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Text(
+                        text = "${product.stockQuantity.toInt()}",
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color(0xFF064E3B)
+                    )
+                    Text(
+                        text = product.baseUnitName.ifEmpty { "صفحه" },
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF047857)
+                    )
+                }
+
+                Text(
+                    text = "الكمية المتوفرة",
+                    fontSize = 9.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF065F46)
+                )
+            }
         }
     }
 }
