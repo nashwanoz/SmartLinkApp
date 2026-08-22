@@ -94,5 +94,63 @@ class AppRepository(
     suspend fun clearAllData() {
         invoiceDao.deleteAllInvoices()
         bondDao.deleteAllBonds()
+        productDao.deleteAllProducts()
+        customerDao.deleteAllCustomers()
+    }
+
+    /**
+     * Execute fiscal year closing:
+     * 1. Rollover each customer's final balance to become their new opening balance (initialBalance).
+     * 2. Rollover current inventory quantities as opening stock.
+     * 3. Clear/archive operational invoices and bonds to reset transactions for the new year.
+     */
+    suspend fun executeFiscalYearClosing(
+        currentCustomers: List<CustomerEntity>,
+        currentProducts: List<ProductEntity>,
+        targetYear: Int
+    ) {
+        // 1. Rollover customer balances
+        val rolledOverCustomers = currentCustomers.map { c ->
+            val finalBalance = if (c.currentBalance != 0.0) c.currentBalance else c.balance
+            c.copy(
+                initialBalance = finalBalance,
+                currentBalance = finalBalance,
+                balance = finalBalance,
+                updatedAt = System.currentTimeMillis()
+            )
+        }
+        if (rolledOverCustomers.isNotEmpty()) {
+            customerDao.insertCustomers(rolledOverCustomers)
+        }
+
+        // 2. Rollover product stock
+        if (currentProducts.isNotEmpty()) {
+            productDao.insertProducts(currentProducts)
+        }
+
+        // 3. Clear operational invoices and bonds
+        invoiceDao.deleteAllInvoices()
+        bondDao.deleteAllBonds()
+    }
+
+    suspend fun restoreAllData(
+        products: List<ProductEntity>,
+        customers: List<CustomerEntity>,
+        invoices: List<InvoiceEntity>,
+        bonds: List<BondEntity>,
+        settings: SystemSettingsEntity?
+    ) {
+        clearAllData()
+        if (products.isNotEmpty()) productDao.insertProducts(products)
+        if (customers.isNotEmpty()) customerDao.insertCustomers(customers)
+        for (inv in invoices) {
+            invoiceDao.insertInvoice(inv)
+        }
+        for (bond in bonds) {
+            bondDao.insertBond(bond)
+        }
+        if (settings != null) {
+            systemSettingsDao.insertOrUpdate(settings)
+        }
     }
 }
