@@ -16,7 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.khamrnet.app.data.model.FinancialBondEntity
+import com.khamrnet.app.data.model.BondEntity
 import com.khamrnet.app.data.model.InvoiceEntity
 import com.khamrnet.app.data.model.ProductEntity
 import com.khamrnet.app.data.model.SystemSettingsEntity
@@ -27,7 +27,7 @@ fun ReportsScreen(
     settings: SystemSettingsEntity,
     invoices: List<InvoiceEntity>,
     products: List<ProductEntity>,
-    bonds: List<FinancialBondEntity>,
+    bonds: List<BondEntity>,
     onNavigateBack: () -> Unit
 ) {
     val totalSales = remember(invoices) { invoices.sumOf { it.total } }
@@ -35,8 +35,12 @@ fun ReportsScreen(
     val creditSales = remember(invoices) { invoices.filter { it.billType == 4 || it.paymentMethod == "CREDIT" }.sumOf { it.total } }
     val lowStockProducts = remember(products) { products.filter { it.stockQuantity <= 10 } }
 
-    val totalReceipts = remember(bonds) { bonds.filter { it.bondType == "RECEIPT" }.sumOf { it.amount } }
-    val totalPayments = remember(bonds) { bonds.filter { it.bondType == "PAYMENT" }.sumOf { it.amount } }
+    val totalReceipts = remember(bonds) {
+        bonds.filter { it.type == "RECEIPT" || it.bondType == "RECEIPT" }.sumOf { it.amount }
+    }
+    val totalPayments = remember(bonds) {
+        bonds.filter { it.type == "PAYMENT" || it.bondType == "PAYMENT" }.sumOf { it.amount }
+    }
 
     Scaffold(
         topBar = {
