@@ -66,7 +66,7 @@ fun MainHomeScreen(
 
     // Computations matching web HomeScreen.tsx
     val totalSales = remember(invoices) {
-        invoices.filter { !it.isCancelled }.sumOf { it.finalTotal }
+        invoices.filter { !it.isCancelled }.sumOf { it.total }
     }
     val totalCashSales = remember(invoices) {
         invoices.filter { !it.isCancelled }.sumOf { it.paidAmount }
