@@ -82,9 +82,9 @@ fun MainHomeScreen(
 
     // Compute remaining cashiers due amount if any
     val cashiersRemainingDue = remember(invoices, bonds) {
-        val cashierInvoices = invoices.filter { !it.isCancelled && it.cashierId.isNotEmpty() && it.cashierId != "admin" }
-        val cashierReceipts = bonds.filter { it.type == "RECEIPT" && it.cashierId.isNotEmpty() && it.cashierId != "admin" }
-        val cashierPayments = bonds.filter { it.type == "PAYMENT" && it.cashierId.isNotEmpty() && it.cashierId != "admin" }
+        val cashierInvoices = invoices.filter { !it.isCancelled && it.createdBy.isNotEmpty() && it.createdBy != "المدير" && it.createdBy != "admin" }
+        val cashierReceipts = bonds.filter { it.type == "RECEIPT" && it.createdBy.isNotEmpty() && it.createdBy != "المدير" && it.createdBy != "admin" }
+        val cashierPayments = bonds.filter { it.type == "PAYMENT" && it.createdBy.isNotEmpty() && it.createdBy != "المدير" && it.createdBy != "admin" }
         (cashierInvoices.sumOf { it.paidAmount } + cashierReceipts.sumOf { it.amount } - cashierPayments.sumOf { it.amount }).coerceAtLeast(0.0)
     }
 
@@ -239,7 +239,7 @@ fun MainHomeScreen(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = "${settings.storeAddress.ifEmpty { "خمر - السوق العام" }} • ${settings.currencyName.ifEmpty { "YER" }}",
+                                text = "${settings.address.ifEmpty { "خمر - السوق العام" }} • ${settings.currencyName.ifEmpty { "YER" }}",
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF94A3B8)
