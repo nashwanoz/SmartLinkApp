@@ -79,7 +79,7 @@ fun AboutScreen(
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    settings.storeName.ifEmpty { "نظام خمر نت لإدارة الشبكات والمبيعات" },
+                    settings.businessName.ifEmpty { "نظام خمر نت لإدارة الشبكات والمبيعات" },
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Black,
                     color = Color(0xFF0F172A),
