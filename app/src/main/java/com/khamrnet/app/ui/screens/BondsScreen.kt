@@ -27,10 +27,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -268,793 +270,784 @@ fun BondsScreen(
     val balanceStatusStr = remember(finalBalance) {
         when {
             finalBalance > 0 -> " (مدين)"
-            finalBalance < 0 -> " (دائن)"
-            else -> " (متزن)"
-        }
-    }
-
-    val movementsCount = remember(statementEntries) {
-        if (statementEntries.isNotEmpty()) statementEntries.size else 4
-    }
-
-    Scaffold(
-        bottomBar = {
-            SettingsBottomNavBar(
-                currentRoute = "bonds",
-                onNavigate = onNavigate
-            )
-        },
-        containerColor = Color(0xFFF8FAFC)
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-        ) {
-            // =========================================================================
-            // 1. TOP BAR & CLOUD SYNC STRIP (Unified KhamrNet Header)
-            // =========================================================================
+       CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+        Scaffold(
+            bottomBar = {
+                SettingsBottomNavBar(
+                    currentRoute = "bonds",
+                    onNavigate = onNavigate
+                )
+            },
+            containerColor = Color(0xFFF8FAFC)
+        ) { innerPadding ->
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White)
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .verticalScroll(rememberScrollState())
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Right: Store Name & Details
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFFF0FDFA))
-                                .border(0.8.dp, Color(0xFF99F6E4), RoundedCornerShape(8.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.Description,
-                                contentDescription = null,
-                                tint = Color(0xFF0F766E),
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-
-                        Column {
-                            Text(
-                                text = settings.businessName.ifEmpty { "شبكة خمر اللاسلكيه" },
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Color(0xFF0F172A)
-                            )
-                            Text(
-                                text = "${settings.address.ifEmpty { "خمر - السوق العام" }} • ${settings.currencyName}",
-                                fontSize = 9.sp,
-                                color = Color(0xFF64748B)
-                            )
-                        }
-                    }
-
-                    // Left: User Badge & Logout
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(Color(0xFFF0FDF4))
-                                .border(0.8.dp, Color(0xFFBBF7D0), RoundedCornerShape(18.dp))
-                                .padding(horizontal = 7.dp, vertical = 2.5.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(Color(0xFF0F766E))
-                                    .padding(horizontal = 4.dp, vertical = 1.dp)
-                            ) {
-                                Text(
-                                    text = "101",
-                                    fontSize = 8.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = Color.White
-                                )
-                            }
-
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(
-                                    text = currentUserName,
-                                    fontSize = 8.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF0F172A),
-                                    maxLines = 1
-                                )
-                                Text(
-                                    text = "مدير",
-                                    fontSize = 7.5.sp,
-                                    color = Color(0xFF0F766E)
-                                )
-                            }
-                        }
-
-                        IconButton(
-                            onClick = onLogout,
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFFFFF1F2))
-                        ) {
-                            Icon(
-                                Icons.Default.ExitToApp,
-                                contentDescription = "تسجيل خروج",
-                                tint = Color(0xFFE11D48),
-                                modifier = Modifier.size(15.dp)
-                            )
-                        }
-                    }
-                }
-
-                // Cloud Sync Strip (Right text with pulse dot, Left action button)
-                val isSyncing = syncStatus.state == SyncState.SYNCING
-                val isSuccess = syncStatus.state == SyncState.SUCCESS && settings.storeCode.isNotEmpty()
-                val currentStoreCode = settings.storeCode.ifEmpty { "TEST-SMART" }
-
-                Row(
+                // =========================================================================
+                // 1. TOP BAR & CLOUD SYNC STRIP (Unified KhamrNet Header)
+                // =========================================================================
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(
-                            when {
-                                isSyncing -> Color(0xFFEFF6FF)
-                                isSuccess -> Color(0xFFECFDF5)
-                                else -> Color(0xFFFFFBEB)
-                            }
-                        )
-                        .border(
-                            width = 0.6.dp,
-                            color = when {
-                                isSyncing -> Color(0xFFBFDBFE)
-                                isSuccess -> Color(0xFFA7F3D0)
-                                else -> Color(0xFFFDE68A)
-                            }
-                        )
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .background(Color.White)
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(
-                                when {
-                                    isSyncing -> Color(0xFFBFDBFE).copy(alpha = 0.6f)
-                                    isSuccess -> Color(0xFFA7F3D0).copy(alpha = 0.6f)
-                                    else -> Color(0xFFFDE68A).copy(alpha = 0.6f)
-                                }
-                            )
-                            .clickable { isStoreActivationOpen = true }
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = "إدارة الربط ❮",
-                            fontSize = 8.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = when {
-                                isSyncing -> Color(0xFF1E40AF)
-                                isSuccess -> Color(0xFF065F46)
-                                else -> Color(0xFF92400E)
-                            }
-                        )
-                    }
-
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "الزامنة السحابية متصلة [$currentStoreCode]",
-                            fontSize = 9.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF065F46)
-                        )
-                        Box(
-                            modifier = Modifier
-                                .size(7.dp)
-                                .scale(pulseScale)
-                                .clip(CircleShape)
-                                .background(Color(0xFF10B981))
-                        )
-                    }
-                }
-            }
-
-            Divider(color = Color(0xFFE2E8F0), thickness = 0.8.dp)
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                // =========================================================================
-                // 2. CARD 1: FILTERS & STATEMENT CONTROLS (Exact Replica of Screenshot)
-                // =========================================================================
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        // ROW 1: نوع التقرير (Label on Right, Compact Select Box on Left)
+                        // Right: Store Name & Details
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .weight(1f)
+                                    .size(32.dp)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(Color.White)
-                                    .border(0.8.dp, Color(0xFFCBD5E1), RoundedCornerShape(8.dp))
-                                    .clickable { isReportTypeDropdownOpen = true }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        Icons.Default.KeyboardArrowDown,
-                                        contentDescription = null,
-                                        tint = Color(0xFF64748B),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Text(
-                                        text = selectedReportType,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF0F172A)
-                                    )
-                                }
-
-                                DropdownMenu(
-                                    expanded = isReportTypeDropdownOpen,
-                                    onDismissRequest = { isReportTypeDropdownOpen = false }
-                                ) {
-                                    reportTypes.forEach { type ->
-                                        DropdownMenuItem(
-                                            text = { Text(type, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-                                            onClick = {
-                                                selectedReportType = type
-                                                isReportTypeDropdownOpen = false
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.width(10.dp))
-
-                            Text(
-                                text = "نوع التقرير:",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Color(0xFF1E293B),
-                                modifier = Modifier.width(85.dp),
-                                textAlign = TextAlign.End
-                            )
-                        }
-
-                        // ROW 2: الحساب التحليلي (Label on Right, Direct Search Input on Left with Dropdown)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(Color.White)
-                                        .border(0.8.dp, Color(0xFFCBD5E1), RoundedCornerShape(8.dp))
-                                        .padding(horizontal = 8.dp, vertical = 3.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    if (customerSearchQuery.isNotEmpty()) {
-                                        IconButton(
-                                            onClick = {
-                                                customerSearchQuery = ""
-                                                selectedCustomerId = ""
-                                                isCustomerSearchOpen = true
-                                            },
-                                            modifier = Modifier.size(18.dp)
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Close,
-                                                contentDescription = "Clear",
-                                                tint = Color(0xFF94A3B8),
-                                                modifier = Modifier.size(13.dp)
-                                            )
-                                        }
-                                    } else {
-                                        Icon(
-                                            Icons.Default.Search,
-                                            contentDescription = null,
-                                            tint = Color(0xFF94A3B8),
-                                            modifier = Modifier.size(15.dp)
-                                        )
-                                    }
-
-                                    BasicTextField(
-                                        value = customerSearchQuery,
-                                        onValueChange = {
-                                            customerSearchQuery = it
-                                            isCustomerSearchOpen = true
-                                            if (selectedCustomerId.isNotEmpty()) {
-                                                selectedCustomerId = ""
-                                            }
-                                        },
-                                        textStyle = TextStyle(
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF0F172A),
-                                            textAlign = TextAlign.End
-                                        ),
-                                        singleLine = true,
-                                        modifier = Modifier.weight(1f).padding(start = 4.dp),
-                                        decorationBox = { innerTextField ->
-                                            Box(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                contentAlignment = Alignment.CenterEnd
-                                            ) {
-                                                if (customerSearchQuery.isEmpty()) {
-                                                    Text(
-                                                        text = "بحث أو اختر الحساب...",
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.Normal,
-                                                        color = Color(0xFF94A3B8),
-                                                        textAlign = TextAlign.End
-                                                    )
-                                                }
-                                                innerTextField()
-                                            }
-                                        }
-                                    )
-                                }
-
-                                DropdownMenu(
-                                    expanded = isCustomerSearchOpen && filteredCustomers.isNotEmpty(),
-                                    onDismissRequest = { isCustomerSearchOpen = false },
-                                    modifier = Modifier
-                                        .fillMaxWidth(0.65f)
-                                        .background(Color.White)
-                                ) {
-                                    filteredCustomers.take(15).forEach { cust ->
-                                        DropdownMenuItem(
-                                            text = {
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Text(
-                                                        text = "${numberFormat.format(cust.balance)} ${settings.currencyName}",
-                                                        fontSize = 9.5.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = Color(0xFF0F766E)
-                                                    )
-                                                    Text(
-                                                        text = "[${cust.code}] ${cust.name}",
-                                                        fontSize = 10.5.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = Color(0xFF0F172A)
-                                                    )
-                                                }
-                                            },
-                                            onClick = {
-                                                selectedCustomerId = cust.id
-                                                customerSearchQuery = "[${cust.code}] ${cust.name}"
-                                                isCustomerSearchOpen = false
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.width(10.dp))
-
-                            Text(
-                                text = "الحساب التحليلي:",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Color(0xFF1E293B),
-                                modifier = Modifier.width(85.dp),
-                                textAlign = TextAlign.End
-                            )
-                        }
-
-                        // ROW 3: من / إلى (Matching Date Selection Row from Screenshot)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // "إلى" Box
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color.White)
-                                    .border(0.8.dp, Color(0xFFCBD5E1), RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 8.dp, vertical = 6.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = Color(0xFF64748B), modifier = Modifier.size(14.dp))
-                                    Text(
-                                        text = toDateStr,
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = Color(0xFF0F172A)
-                                    )
-                                }
-                            }
-
-                            Text(
-                                text = "إلى:",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Color(0xFF1E293B),
-                                modifier = Modifier.padding(horizontal = 4.dp)
-                            )
-
-                            // "من" Box
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color.White)
-                                    .border(0.8.dp, Color(0xFFCBD5E1), RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 8.dp, vertical = 6.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = Color(0xFF64748B), modifier = Modifier.size(14.dp))
-                                    Text(
-                                        text = fromDateStr,
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = Color(0xFF0F172A)
-                                    )
-                                }
-                            }
-
-                            Text(
-                                text = "من:",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Color(0xFF1E293B),
-                                modifier = Modifier.padding(start = 4.dp, end = 2.dp)
-                            )
-                        }
-
-                        // ROW 4: العملة (Label on Right, Dropdown on Left)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color.White)
-                                    .border(0.8.dp, Color(0xFFCBD5E1), RoundedCornerShape(8.dp))
-                                    .clickable { isCurrencyDropdownOpen = true }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = Color(0xFF64748B), modifier = Modifier.size(16.dp))
-                                    Text(
-                                        text = selectedCurrency,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF0F172A)
-                                    )
-                                }
-
-                                DropdownMenu(
-                                    expanded = isCurrencyDropdownOpen,
-                                    onDismissRequest = { isCurrencyDropdownOpen = false }
-                                ) {
-                                    currencies.forEach { cur ->
-                                        DropdownMenuItem(
-                                            text = { Text(cur, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-                                            onClick = {
-                                                selectedCurrency = cur
-                                                isCurrencyDropdownOpen = false
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.width(10.dp))
-
-                            Text(
-                                text = "العملة:",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Color(0xFF1E293B),
-                                modifier = Modifier.width(85.dp),
-                                textAlign = TextAlign.End
-                            )
-                        }
-
-                        // ROW 5: ACTION BUTTONS (Left: Refresh, Middle: PDF Print, Right: View Report)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Left: Refresh button
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0xFFF1F5F9))
-                                    .border(0.8.dp, Color(0xFFCBD5E1), RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        onTriggerSync()
-                                        Toast.makeText(context, "تم تحديث البيانات", Toast.LENGTH_SHORT).show()
-                                    },
+                                    .background(Color(0xFFF0FDFA))
+                                    .border(0.8.dp, Color(0xFF99F6E4), RoundedCornerShape(8.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    Icons.Default.Refresh,
-                                    contentDescription = "تحديث",
-                                    tint = Color(0xFF475569),
-                                    modifier = Modifier.size(16.dp)
+                                    Icons.Default.Description,
+                                    contentDescription = null,
+                                    tint = Color(0xFF0F766E),
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
 
-                            // Middle: PDF Print Button (Dark Navy)
-                            Button(
-                                onClick = {
-                                    Toast.makeText(context, "جاري إعداد تقرير PDF للطباعة...", Toast.LENGTH_SHORT).show()
-                                    showStatementModal = true
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F172A)),
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(36.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
-                                ) {
-                                    Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(14.dp))
-                                    Text("طباعة PDF", fontSize = 11.sp, fontWeight = FontWeight.Black)
-                                }
-                            }
-
-                            // Right: View Report Button (Green #0F766E)
-                            Button(
-                                onClick = { showStatementModal = true },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                modifier = Modifier
-                                    .weight(1.3f)
-                                    .height(36.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
-                                ) {
-                                    Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(14.dp))
-                                    Text("عرض التقرير", fontSize = 11.sp, fontWeight = FontWeight.Black)
-                                }
+                            Column {
+                                Text(
+                                    text = settings.businessName.ifEmpty { "شبكة خمر اللاسلكيه" },
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color(0xFF0F172A)
+                                )
+                                Text(
+                                    text = "${settings.address.ifEmpty { "خمر - السوق العام" }} • ${settings.currencyName}",
+                                    fontSize = 9.sp,
+                                    color = Color(0xFF64748B)
+                                )
                             }
                         }
-                    }
-                }
 
-                // =========================================================================
-                // 3. CARD 2: SUMMARY & INSTANT BALANCES (Matching Image Card 2 Exactly)
-                // =========================================================================
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        // Header Text: نوع الحساب: عملاء
-                        Text(
-                            text = "نوع الحساب:  ${selectedReportType}",
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Black,
-                            color = Color(0xFF0F172A),
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.End
-                        )
-
-                        Divider(color = Color(0xFFF1F5F9), thickness = 1.dp)
-
-                        // 3 Compact Boxes side-by-side (Right to Left: دائن, مدين, الرصيد النهائي)
+                        // Left: User Badge & Logout
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            // 3. Box Left: الرصيد النهائي
-                            Box(
+                            Row(
                                 modifier = Modifier
-                                    .weight(1.2f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0xFFF8FAFC))
-                                    .border(0.8.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
-                                    .padding(vertical = 10.dp, horizontal = 4.dp),
-                                contentAlignment = Alignment.Center
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(Color(0xFFF0FDF4))
+                                    .border(0.8.dp, Color(0xFFBBF7D0), RoundedCornerShape(18.dp))
+                                    .padding(horizontal = 7.dp, vertical = 2.5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
                             ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF0F766E))
+                                        .padding(horizontal = 4.dp, vertical = 1.dp)
                                 ) {
                                     Text(
-                                        text = "الرصيد النهائي",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF64748B)
-                                    )
-                                    Text(
-                                        text = "${numberFormat.format(finalBalance)}${balanceStatusStr}",
-                                        fontSize = 12.sp,
+                                        text = "101",
+                                        fontSize = 8.sp,
                                         fontWeight = FontWeight.Black,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = Color(0xFF0F172A)
+                                        color = Color.White
                                     )
                                 }
-                            }
 
-                            // 2. Box Middle: مدين
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0xFFF8FAFC))
-                                    .border(0.8.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
-                                    .padding(vertical = 10.dp, horizontal = 4.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
+                                Column(horizontalAlignment = Alignment.Start) {
                                     Text(
-                                        text = "مدين",
-                                        fontSize = 10.sp,
+                                        text = currentUserName,
+                                        fontSize = 8.5.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF64748B)
+                                        color = Color(0xFF0F172A),
+                                        maxLines = 1
                                     )
                                     Text(
-                                        text = numberFormat.format(totalDebit),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Black,
-                                        fontFamily = FontFamily.Monospace,
+                                        text = "مدير",
+                                        fontSize = 7.5.sp,
                                         color = Color(0xFF0F766E)
                                     )
                                 }
                             }
 
-                            // 1. Box Right: دائن
+                            IconButton(
+                                onClick = onLogout,
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFFFFF1F2))
+                            ) {
+                                Icon(
+                                    Icons.Default.ExitToApp,
+                                    contentDescription = "تسجيل خروج",
+                                    tint = Color(0xFFE11D48),
+                                    modifier = Modifier.size(15.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Cloud Sync Strip (Right text with pulse dot, Left action button)
+                    val isSyncing = syncStatus.state == SyncState.SYNCING
+                    val isSuccess = syncStatus.state == SyncState.SUCCESS && settings.storeCode.isNotEmpty()
+                    val currentStoreCode = settings.storeCode.ifEmpty { "TEST-SMART" }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                when {
+                                    isSyncing -> Color(0xFFEFF6FF)
+                                    isSuccess -> Color(0xFFECFDF5)
+                                    else -> Color(0xFFFFFBEB)
+                                }
+                            )
+                            .border(
+                                width = 0.6.dp,
+                                color = when {
+                                    isSyncing -> Color(0xFFBFDBFE)
+                                    isSuccess -> Color(0xFFA7F3D0)
+                                    else -> Color(0xFFFDE68A)
+                                }
+                            )
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
                             Box(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0xFFF8FAFC))
-                                    .border(0.8.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
-                                    .padding(vertical = 10.dp, horizontal = 4.dp),
-                                contentAlignment = Alignment.Center
+                                    .size(7.dp)
+                                    .scale(pulseScale)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF10B981))
+                            )
+                            Text(
+                                text = "المزامنة السحابية متصلة [$currentStoreCode]",
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF065F46)
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(
+                                    when {
+                                        isSyncing -> Color(0xFFBFDBFE).copy(alpha = 0.6f)
+                                        isSuccess -> Color(0xFFA7F3D0).copy(alpha = 0.6f)
+                                        else -> Color(0xFFFDE68A).copy(alpha = 0.6f)
+                                    }
+                                )
+                                .clickable { isStoreActivationOpen = true }
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "إدارة الربط ❮",
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = when {
+                                    isSyncing -> Color(0xFF1E40AF)
+                                    isSuccess -> Color(0xFF065F46)
+                                    else -> Color(0xFF92400E)
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Divider(color = Color(0xFFE2E8F0), thickness = 0.8.dp)
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    // =========================================================================
+                    // 2. CARD 1: FILTERS & STATEMENT CONTROLS (Right-to-Left)
+                    // =========================================================================
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            // ROW 1: نوع التقرير (Label on Right, Select on Left in RTL)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                Text(
+                                    text = "نوع التقرير:",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color(0xFF1E293B),
+                                    modifier = Modifier.width(85.dp),
+                                    textAlign = TextAlign.Start
+                                )
+
+                                Spacer(modifier = Modifier.width(10.dp))
+
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color.White)
+                                        .border(0.8.dp, Color(0xFFCBD5E1), RoundedCornerShape(8.dp))
+                                        .clickable { isReportTypeDropdownOpen = true }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
                                 ) {
-                                    Text(
-                                        text = "دائن",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF64748B)
-                                    )
-                                    Text(
-                                        text = numberFormat.format(totalCredit),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Black,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = Color(0xFF2563EB)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = selectedReportType,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF0F172A)
+                                        )
+                                        Icon(
+                                            Icons.Default.KeyboardArrowDown,
+                                            contentDescription = null,
+                                            tint = Color(0xFF64748B),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+
+                                    DropdownMenu(
+                                        expanded = isReportTypeDropdownOpen,
+                                        onDismissRequest = { isReportTypeDropdownOpen = false }
+                                    ) {
+                                        reportTypes.forEach { type ->
+                                            DropdownMenuItem(
+                                                text = { Text(type, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                                                onClick = {
+                                                    selectedReportType = type
+                                                    isReportTypeDropdownOpen = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // ROW 2: الحساب التحليلي (Label on Right, Search Input on Left in RTL)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "الحساب التحليلي:",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color(0xFF1E293B),
+                                    modifier = Modifier.width(85.dp),
+                                    textAlign = TextAlign.Start
+                                )
+
+                                Spacer(modifier = Modifier.width(10.dp))
+
+                                Box(
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color.White)
+                                            .border(0.8.dp, Color(0xFFCBD5E1), RoundedCornerShape(8.dp))
+                                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        BasicTextField(
+                                            value = customerSearchQuery,
+                                            onValueChange = {
+                                                customerSearchQuery = it
+                                                isCustomerSearchOpen = true
+                                                if (selectedCustomerId.isNotEmpty()) {
+                                                    selectedCustomerId = ""
+                                                }
+                                            },
+                                            textStyle = TextStyle(
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF0F172A),
+                                                textAlign = TextAlign.Start
+                                            ),
+                                            singleLine = true,
+                                            modifier = Modifier.weight(1f).padding(end = 4.dp),
+                                            decorationBox = { innerTextField ->
+                                                Box(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    contentAlignment = Alignment.CenterStart
+                                                ) {
+                                                    if (customerSearchQuery.isEmpty()) {
+                                                        Text(
+                                                            text = "بحث أو اختر الحساب...",
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.Normal,
+                                                            color = Color(0xFF94A3B8),
+                                                            textAlign = TextAlign.Start
+                                                        )
+                                                    }
+                                                    innerTextField()
+                                                }
+                                            }
+                                        )
+
+                                        if (customerSearchQuery.isNotEmpty()) {
+                                            IconButton(
+                                                onClick = {
+                                                    customerSearchQuery = ""
+                                                    selectedCustomerId = ""
+                                                    isCustomerSearchOpen = true
+                                                },
+                                                modifier = Modifier.size(18.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Close,
+                                                    contentDescription = "Clear",
+                                                    tint = Color(0xFF94A3B8),
+                                                    modifier = Modifier.size(13.dp)
+                                                )
+                                            }
+                                        } else {
+                                            Icon(
+                                                Icons.Default.Search,
+                                                contentDescription = null,
+                                                tint = Color(0xFF94A3B8),
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                        }
+                                    }
+
+                                    DropdownMenu(
+                                        expanded = isCustomerSearchOpen && filteredCustomers.isNotEmpty(),
+                                        onDismissRequest = { isCustomerSearchOpen = false },
+                                        modifier = Modifier
+                                            .fillMaxWidth(0.65f)
+                                            .background(Color.White)
+                                    ) {
+                                        filteredCustomers.take(15).forEach { cust ->
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text(
+                                                            text = "[${cust.code}] ${cust.name}",
+                                                            fontSize = 10.5.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = Color(0xFF0F172A)
+                                                        )
+                                                        Text(
+                                                            text = "${numberFormat.format(cust.balance)} ${settings.currencyName}",
+                                                            fontSize = 9.5.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = Color(0xFF0F766E)
+                                                        )
+                                                    }
+                                                },
+                                                onClick = {
+                                                    selectedCustomerId = cust.id
+                                                    customerSearchQuery = "[${cust.code}] ${cust.name}"
+                                                    isCustomerSearchOpen = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // ROW 3: من / إلى (Dates in Right-to-Left order: من -> Date -> إلى -> Date)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "من:",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color(0xFF1E293B),
+                                    modifier = Modifier.padding(end = 4.dp)
+                                )
+
+                                // "من" Box
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color.White)
+                                        .border(0.8.dp, Color(0xFFCBD5E1), RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = fromDateStr,
+                                            fontSize = 10.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = Color(0xFF0F172A)
+                                        )
+                                        Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = Color(0xFF64748B), modifier = Modifier.size(14.dp))
+                                    }
+                                }
+
+                                Text(
+                                    text = "إلى:",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color(0xFF1E293B),
+                                    modifier = Modifier.padding(horizontal = 6.dp)
+                                )
+
+                                // "إلى" Box
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color.White)
+                                        .border(0.8.dp, Color(0xFFCBD5E1), RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = toDateStr,
+                                            fontSize = 10.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = Color(0xFF0F172A)
+                                        )
+                                        Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = Color(0xFF64748B), modifier = Modifier.size(14.dp))
+                                    }
+                                }
+                            }
+
+                            // ROW 4: العملة (Label on Right, Dropdown on Left in RTL)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "العملة:",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color(0xFF1E293B),
+                                    modifier = Modifier.width(85.dp),
+                                    textAlign = TextAlign.Start
+                                )
+
+                                Spacer(modifier = Modifier.width(10.dp))
+
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color.White)
+                                        .border(0.8.dp, Color(0xFFCBD5E1), RoundedCornerShape(8.dp))
+                                        .clickable { isCurrencyDropdownOpen = true }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = selectedCurrency,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF0F172A)
+                                        )
+                                        Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = Color(0xFF64748B), modifier = Modifier.size(16.dp))
+                                    }
+
+                                    DropdownMenu(
+                                        expanded = isCurrencyDropdownOpen,
+                                        onDismissRequest = { isCurrencyDropdownOpen = false }
+                                    ) {
+                                        currencies.forEach { cur ->
+                                            DropdownMenuItem(
+                                                text = { Text(cur, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                                                onClick = {
+                                                    selectedCurrency = cur
+                                                    isCurrencyDropdownOpen = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // ROW 5: ACTION BUTTONS (Right: View Report, Middle: PDF Print, Left: Refresh)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Right: View Report Button (Green #0F766E)
+                                Button(
+                                    onClick = { showStatementModal = true },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                    modifier = Modifier
+                                        .weight(1.3f)
+                                        .height(36.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                    ) {
+                                        Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Text("عرض التقرير", fontSize = 11.sp, fontWeight = FontWeight.Black)
+                                    }
+                                }
+
+                                // Middle: PDF Print Button (Dark Navy)
+                                Button(
+                                    onClick = {
+                                        Toast.makeText(context, "جاري إعداد تقرير PDF للطباعة...", Toast.LENGTH_SHORT).show()
+                                        showStatementModal = true
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F172A)),
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(36.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                    ) {
+                                        Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Text("طباعة PDF", fontSize = 11.sp, fontWeight = FontWeight.Black)
+                                    }
+                                }
+
+                                // Left: Refresh button
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFFF1F5F9))
+                                        .border(0.8.dp, Color(0xFFCBD5E1), RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            onTriggerSync()
+                                            Toast.makeText(context, "تم تحديث البيانات", Toast.LENGTH_SHORT).show()
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = "تحديث",
+                                        tint = Color(0xFF475569),
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
                             }
                         }
+                    }
 
-                        // Bottom Metadata Lines
+                    // =========================================================================
+                    // 3. CARD 2: SUMMARY & INSTANT BALANCES (Right to Left: دائن, مدين, الرصيد النهائي)
+                    // =========================================================================
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 4.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
+                            // Header Text: نوع الحساب: عملاء
                             Text(
-                                text = "عملة الحساب:  ${selectedCurrency}    سعر الصرف (cur_rate) : 1",
-                                fontSize = 9.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF475569),
-                                textAlign = TextAlign.End,
-                                modifier = Modifier.fillMaxWidth()
+                                text = "نوع الحساب:  ${selectedReportType}",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFF0F172A),
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Start
                             )
 
-                            Text(
-                                text = "عدد الحركات :  ${movementsCount}",
-                                fontSize = 9.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF475569),
-                                textAlign = TextAlign.End,
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                            Divider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+
+                            // 3 Compact Boxes side-by-side (Right to Left: دائن, مدين, الرصيد النهائي)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // 1. Box Right: دائن
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFFF8FAFC))
+                                        .border(0.8.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
+                                        .padding(vertical = 10.dp, horizontal = 4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Text(
+                                            text = "دائن",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF64748B)
+                                        )
+                                        Text(
+                                            text = numberFormat.format(totalCredit),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Black,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = Color(0xFF2563EB)
+                                        )
+                                    }
+                                }
+
+                                // 2. Box Middle: مدين
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFFF8FAFC))
+                                        .border(0.8.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
+                                        .padding(vertical = 10.dp, horizontal = 4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Text(
+                                            text = "مدين",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF64748B)
+                                        )
+                                        Text(
+                                            text = numberFormat.format(totalDebit),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Black,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = Color(0xFF0F766E)
+                                        )
+                                    }
+                                }
+
+                                // 3. Box Left: الرصيد النهائي
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1.2f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFFF8FAFC))
+                                        .border(0.8.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
+                                        .padding(vertical = 10.dp, horizontal = 4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Text(
+                                            text = "الرصيد النهائي",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF64748B)
+                                        )
+                                        Text(
+                                            text = "${numberFormat.format(finalBalance)}${balanceStatusStr}",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Black,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = Color(0xFF0F172A)
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Bottom Metadata Lines
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text(
+                                    text = "عملة الحساب:  ${selectedCurrency}    سعر الصرف (cur_rate) : 1",
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF475569),
+                                    textAlign = TextAlign.Start,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                Text(
+                                    text = "عدد الحركات :  ${movementsCount}",
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF475569),
+                                    textAlign = TextAlign.Start,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
                         }
                     }
                 }
             }
         }
     }
-
-
 
     // =============================================================================
     // 5. DETAILED STATEMENT MODAL (عند الضغط على عرض التقرير)
@@ -1064,148 +1057,174 @@ fun BondsScreen(
             onDismissRequest = { showStatementModal = false },
             properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth(0.95f)
-                    .clip(RoundedCornerShape(16.dp)),
-                colors = CardDefaults.cardColors(containerColor = Color.White)
-            ) {
-                Column(
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                Card(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                        .fillMaxWidth(0.95f)
+                        .clip(RoundedCornerShape(16.dp)),
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
                 ) {
-                    // Header
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = { showStatementModal = false }, modifier = Modifier.size(24.dp)) {
-                            Icon(Icons.Default.Close, contentDescription = null, tint = Color(0xFF64748B))
-                        }
-
-                        Text(
-                            text = "كشف حساب تحليلي: ${selectedCustomer?.name ?: selectedReportType}",
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Black,
-                            color = Color(0xFF0F172A)
-                        )
-                    }
-
-                    Divider(color = Color(0xFFE2E8F0), thickness = 0.8.dp)
-
-                    // Movements Table
-                    LazyColumn(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 300.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        items(statementEntries) { entry ->
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0xFFF8FAFC))
-                                    .border(0.6.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
-                                    .padding(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(3.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "${numberFormat.format(entry.balance)} ${settings.currencyName}",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Black,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = Color(0xFF0F172A)
-                                    )
-                                    Text(
-                                        text = "${entry.type} #${entry.docNumber}",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF0F766E)
-                                    )
-                                }
+                        // Header
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "كشف حساب تحليلي: ${selectedCustomer?.name ?: selectedReportType}",
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFF0F172A)
+                            )
 
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                            IconButton(onClick = { showStatementModal = false }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.Close, contentDescription = null, tint = Color(0xFF64748B))
+                            }
+                        }
+
+                        Divider(color = Color(0xFFE2E8F0), thickness = 0.8.dp)
+
+                        // Modal Ribbon Summary
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFFF8FAFC))
+                                .border(0.8.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
+                                .padding(8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                                Text("إجمالي الدائن", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFF64748B))
+                                Text("${numberFormat.format(totalCredit)} ${settings.currencyName}", fontSize = 10.5.sp, fontWeight = FontWeight.Black, color = Color(0xFF2563EB))
+                            }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                                Text("إجمالي المدين", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFF64748B))
+                                Text("${numberFormat.format(totalDebit)} ${settings.currencyName}", fontSize = 10.5.sp, fontWeight = FontWeight.Black, color = Color(0xFF0F766E))
+                            }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                                Text("الرصيد النهائي", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFF64748B))
+                                Text("${numberFormat.format(finalBalance)} ${settings.currencyName}", fontSize = 10.5.sp, fontWeight = FontWeight.Black, color = Color(0xFF0F172A))
+                            }
+                        }
+
+                        // Movements Table
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 300.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            items(statementEntries) { entry ->
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFFF8FAFC))
+                                        .border(0.6.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
+                                        .padding(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(3.dp)
                                 ) {
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        if (entry.debit > 0) {
-                                            Text(
-                                                text = "مدين: ${numberFormat.format(entry.debit)}",
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color(0xFF059669)
-                                            )
-                                        }
-                                        if (entry.credit > 0) {
-                                            Text(
-                                                text = "دائن: ${numberFormat.format(entry.credit)}",
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color(0xFF2563EB)
-                                            )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "${entry.type} #${entry.docNumber}",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF0F766E)
+                                        )
+                                        Text(
+                                            text = "${numberFormat.format(entry.balance)} ${settings.currencyName}",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Black,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = Color(0xFF0F172A)
+                                        )
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = entry.note,
+                                            fontSize = 9.sp,
+                                            color = Color(0xFF64748B)
+                                        )
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            if (entry.debit > 0) {
+                                                Text(
+                                                    text = "مدين: ${numberFormat.format(entry.debit)}",
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFF059669)
+                                                )
+                                            }
+                                            if (entry.credit > 0) {
+                                                Text(
+                                                    text = "دائن: ${numberFormat.format(entry.credit)}",
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFF2563EB)
+                                                )
+                                            }
                                         }
                                     }
-                                    Text(
-                                        text = entry.note,
-                                        fontSize = 9.sp,
-                                        color = Color(0xFF64748B)
-                                    )
                                 }
                             }
                         }
-                    }
 
-                    // Share & Print Actions
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                val targetPhone = selectedCustomer?.phone?.replace("+", "")?.trim() ?: ""
-                                val shareText = "كشف حساب تحليلي\n" +
-                                        "المنشأة: ${settings.businessName}\n" +
-                                        "الحساب: ${selectedCustomer?.name ?: selectedReportType}\n" +
-                                        "إجمالي المدين: ${numberFormat.format(totalDebit)} ${settings.currencyName}\n" +
-                                        "إجمالي الدائن: ${numberFormat.format(totalCredit)} ${settings.currencyName}\n" +
-                                        "الرصيد النهائي: ${numberFormat.format(finalBalance)} ${settings.currencyName}${balanceStatusStr}"
+                        // Share & Print Actions
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    Toast.makeText(context, "تم إرسال أمر الطباعة", Toast.LENGTH_SHORT).show()
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f).height(36.dp)
+                            ) {
+                                Text("طباعة الكشف", fontSize = 11.sp, fontWeight = FontWeight.Black)
+                            }
 
-                                try {
-                                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                                        data = Uri.parse("https://api.whatsapp.com/send?phone=$targetPhone&text=${Uri.encode(shareText)}")
+                            Button(
+                                onClick = {
+                                    val targetPhone = selectedCustomer?.phone?.replace("+", "")?.trim() ?: ""
+                                    val shareText = "كشف حساب تحليلي\n" +
+                                            "المنشأة: ${settings.businessName}\n" +
+                                            "الحساب: ${selectedCustomer?.name ?: selectedReportType}\n" +
+                                            "إجمالي المدين: ${numberFormat.format(totalDebit)} ${settings.currencyName}\n" +
+                                            "إجمالي الدائن: ${numberFormat.format(totalCredit)} ${settings.currencyName}\n" +
+                                            "الرصيد النهائي: ${numberFormat.format(finalBalance)} ${settings.currencyName}${balanceStatusStr}"
+
+                                    try {
+                                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                                            data = Uri.parse("https://api.whatsapp.com/send?phone=$targetPhone&text=${Uri.encode(shareText)}")
+                                        }
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "تعذر فتح تطبيق واتساب", Toast.LENGTH_SHORT).show()
                                     }
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "تعذر فتح تطبيق واتساب", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f).height(36.dp)
-                        ) {
-                            Text("مشاركة واتساب", fontSize = 11.sp, fontWeight = FontWeight.Black)
-                        }
-
-                        Button(
-                            onClick = {
-                                Toast.makeText(context, "تم إرسال أمر الطباعة", Toast.LENGTH_SHORT).show()
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f).height(36.dp)
-                        ) {
-                            Text("طباعة الكشف", fontSize = 11.sp, fontWeight = FontWeight.Black)
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f).height(36.dp)
+                            ) {
+                                Text("مشاركة واتساب", fontSize = 11.sp, fontWeight = FontWeight.Black)
+                            }
                         }
                     }
                 }
