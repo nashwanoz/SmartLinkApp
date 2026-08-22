@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.khamrnet.app.data.model.CustomerEntity
-import com.khamrnet.app.data.model.FinancialBondEntity
+import com.khamrnet.app.data.model.BondEntity
 import com.khamrnet.app.data.model.SystemSettingsEntity
 import java.text.SimpleDateFormat
 import java.util.*
@@ -34,10 +34,10 @@ import java.util.*
 @Composable
 fun BondsScreen(
     settings: SystemSettingsEntity,
-    bonds: List<FinancialBondEntity>,
+    bonds: List<BondEntity>,
     customers: List<CustomerEntity>,
     currentUserName: String,
-    onSaveBond: (FinancialBondEntity) -> Unit,
+    onSaveBond: (BondEntity) -> Unit,
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -48,11 +48,19 @@ fun BondsScreen(
     val filteredBonds = remember(bonds, searchTerm) {
         val s = searchTerm.trim().lowercase()
         if (s.isEmpty()) bonds
-        else bonds.filter { it.bondNumber.contains(s) || it.partyName.lowercase().contains(s) || it.notes.lowercase().contains(s) }
+        else bonds.filter {
+            val pName = it.partyName.ifEmpty { it.customerName }
+            val nText = it.notes.ifEmpty { it.note }
+            it.bondNumber.contains(s) || pName.lowercase().contains(s) || nText.lowercase().contains(s)
+        }
     }
 
-    val totalReceipts = remember(bonds) { bonds.filter { it.bondType == "RECEIPT" }.sumOf { it.amount } }
-    val totalPayments = remember(bonds) { bonds.filter { it.bondType == "PAYMENT" }.sumOf { it.amount } }
+    val totalReceipts = remember(bonds) {
+        bonds.filter { it.type == "RECEIPT" || it.bondType == "RECEIPT" }.sumOf { it.amount }
+    }
+    val totalPayments = remember(bonds) {
+        bonds.filter { it.type == "PAYMENT" || it.bondType == "PAYMENT" }.sumOf { it.amount }
+    }
 
     Scaffold(
         topBar = {
@@ -148,7 +156,9 @@ fun BondsScreen(
                     items(filteredBonds, key = { it.id }) { bond ->
                         val dateFormat = SimpleDateFormat("yyyy/MM/dd  hh:mm a", Locale("ar"))
                         val formattedDate = dateFormat.format(Date(bond.date))
-                        val isReceipt = bond.bondType == "RECEIPT"
+                        val isReceipt = (bond.type == "RECEIPT" || bond.bondType == "RECEIPT")
+                        val party = bond.partyName.ifEmpty { bond.customerName }
+                        val noteText = bond.notes.ifEmpty { bond.note }
 
                         Card(
                             modifier = Modifier.fillMaxWidth(),
@@ -184,7 +194,7 @@ fun BondsScreen(
 
                                     Column {
                                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            Text(bond.partyName, fontSize = 13.sp, fontWeight = FontWeight.Black, color = Color(0xFF0F172A))
+                                            Text(party, fontSize = 13.sp, fontWeight = FontWeight.Black, color = Color(0xFF0F172A))
                                             Box(
                                                 modifier = Modifier
                                                     .clip(RoundedCornerShape(4.dp))
@@ -200,8 +210,8 @@ fun BondsScreen(
                                             }
                                         }
                                         Text(formattedDate, fontSize = 9.5.sp, color = Color(0xFF94A3B8))
-                                        if (bond.notes.isNotBlank()) {
-                                            Text("ملاحظة: ${bond.notes}", fontSize = 10.sp, color = Color(0xFF64748B))
+                                        if (noteText.isNotBlank()) {
+                                            Text("ملاحظة: $noteText", fontSize = 10.sp, color = Color(0xFF64748B))
                                         }
                                     }
                                 }
@@ -242,7 +252,7 @@ fun AddBondDialog(
     currency: String,
     currentUserName: String,
     onDismiss: () -> Unit,
-    onSave: (FinancialBondEntity) -> Unit
+    onSave: (BondEntity) -> Unit
 ) {
     var bondType by remember { mutableStateOf("RECEIPT") } // RECEIPT or PAYMENT
     var selectedCustomer by remember { mutableStateOf<CustomerEntity?>(null) }
@@ -365,15 +375,19 @@ fun AddBondDialog(
                                 return@Button
                             }
 
-                            val bond = FinancialBondEntity(
+                            val bond = BondEntity(
                                 id = UUID.randomUUID().toString(),
                                 bondNumber = "BOND-${System.currentTimeMillis().toString().takeLast(6)}",
+                                type = bondType,
                                 bondType = bondType,
                                 partyType = if (selectedCustomer != null) "CUSTOMER" else "OTHER",
                                 partyId = selectedCustomer?.id ?: "",
                                 partyName = party,
+                                customerId = selectedCustomer?.id ?: "",
+                                customerName = party,
                                 amount = amt,
                                 date = System.currentTimeMillis(),
+                                note = notes.trim(),
                                 notes = notes.trim(),
                                 createdBy = currentUserName
                             )
