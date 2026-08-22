@@ -270,7 +270,16 @@ fun BondsScreen(
     val balanceStatusStr = remember(finalBalance) {
         when {
             finalBalance > 0 -> " (مدين)"
-       CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+            finalBalance < 0 -> " (دائن)"
+            else -> " (متزن)"
+        }
+    }
+
+    val movementsCount = remember(statementEntries) {
+        if (statementEntries.isNotEmpty()) statementEntries.size else 4
+    }
+
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Scaffold(
             bottomBar = {
                 SettingsBottomNavBar(
