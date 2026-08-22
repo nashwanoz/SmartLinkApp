@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.khamrnet.app.data.model.*
 import java.text.NumberFormat
+import java.text.SimpleDateFormat
 import java.util.*
 
 data class LedgerEntry(
@@ -48,6 +49,7 @@ fun AccountingLedgerScreen(
     val context = LocalContext.current
     val currency = settings.currencyName.ifEmpty { "YER" }
     val numberFormat = remember { NumberFormat.getNumberInstance(Locale.US) }
+    val sdf = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US) }
 
     var selectedTab by remember { mutableStateOf("ALL") }
 
@@ -57,12 +59,13 @@ fun AccountingLedgerScreen(
 
         // 1. Invoices entries
         invoices.filter { !it.isCancelled }.forEach { inv ->
+            val dateStr = sdf.format(Date(inv.date))
             // Cash part
             if (inv.paidAmount > 0) {
                 list.add(
                     LedgerEntry(
                         id = "inv_cash_${inv.id}",
-                        date = inv.invoiceDate,
+                        date = dateStr,
                         reference = "فاتورة #${inv.invoiceNumber}",
                         description = "مبيعات نقدية - ${inv.customerName}",
                         debitAccount = "1101 - الصندوق والنقدية",
@@ -76,7 +79,7 @@ fun AccountingLedgerScreen(
                 list.add(
                     LedgerEntry(
                         id = "inv_credit_${inv.id}",
-                        date = inv.invoiceDate,
+                        date = dateStr,
                         reference = "فاتورة #${inv.invoiceNumber}",
                         description = "مبيعات آجلة على الحساب - ${inv.customerName}",
                         debitAccount = "1201 - ذمم العملاء (${inv.customerName})",
@@ -89,11 +92,12 @@ fun AccountingLedgerScreen(
 
         // 2. Bonds entries
         bonds.forEach { bond ->
+            val dateStr = sdf.format(Date(bond.date))
             if (bond.type == "RECEIPT") {
                 list.add(
                     LedgerEntry(
                         id = "bond_rec_${bond.id}",
-                        date = bond.bondDate,
+                        date = dateStr,
                         reference = "سند قبض #${bond.bondNumber}",
                         description = "تحصيل دفعة نقدية من ${bond.customerName} - ${bond.notes}",
                         debitAccount = "1101 - الصندوق والنقدية",
@@ -105,7 +109,7 @@ fun AccountingLedgerScreen(
                 list.add(
                     LedgerEntry(
                         id = "bond_pay_${bond.id}",
-                        date = bond.bondDate,
+                        date = dateStr,
                         reference = "سند صرف #${bond.bondNumber}",
                         description = "صرف نقدي لـ ${bond.customerName} - ${bond.notes}",
                         debitAccount = "5101 - المصاريف والمدفوعات",
