@@ -1,11 +1,6 @@
 package com.khamrnet.app.ui
 
-import com.khamrnet.app.data.CashBoxEntity
-import com.khamrnet.app.data.CustomerEntity
-import com.khamrnet.app.data.FinancialBondEntity
-import com.khamrnet.app.data.InvoiceEntity
-import com.khamrnet.app.data.ProductEntity
-import com.khamrnet.app.data.UserEntity
+import com.khamrnet.app.data.model.*
 
 data class SaleReceipt(
     val invoice: InvoiceEntity,
@@ -13,7 +8,7 @@ data class SaleReceipt(
 )
 
 data class BondReceipt(
-    val bond: FinancialBondEntity,
+    val bond: BondEntity,
     val customer: CustomerEntity
 )
 
@@ -31,7 +26,7 @@ data class AppUiState(
     val customers: List<CustomerEntity> = emptyList(),
     val users: List<UserEntity> = emptyList(),
     val invoices: List<InvoiceEntity> = emptyList(),
-    val bonds: List<FinancialBondEntity> = emptyList(),
+    val bonds: List<BondEntity> = emptyList(),
     val cashBoxes: List<CashBoxEntity> = emptyList(),
     val stock: Map<Long, Int> = emptyMap(),
     val cashBalances: Map<Long, Double> = emptyMap(),

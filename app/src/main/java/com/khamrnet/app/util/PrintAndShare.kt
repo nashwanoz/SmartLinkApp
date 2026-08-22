@@ -5,28 +5,28 @@ import android.bluetooth.BluetoothDevice
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import com.khamrnet.app.data.CustomerEntity
-import com.khamrnet.app.data.CustomerStatementRow
-import com.khamrnet.app.data.FinancialBondEntity
-import com.khamrnet.app.data.InvoiceEntity
+import com.khamrnet.app.data.model.*
 import java.io.File
 import java.net.URLEncoder
 
 object PrintAndShare {
     fun whatsapp(context: Context, customer: CustomerEntity?, invoice: InvoiceEntity) {
-        val text = "عميلنا العزيز ${customer?.name ?: "النقدي"}\nعليكم فاتورة بمبلغ: ${"%.2f".format(invoice.total)}\nرصيدكم الإجمالي: ${"%.2f".format(invoice.newBalance)}\nرقم الفاتورة: ${invoice.id}"
-        shareText(context, customer?.mobile, text)
+        val phone = customer?.phone?.ifEmpty { customer.mobile }
+        val text = "عميلنا العزيز ${customer?.name ?: "النقدي"}\nعليكم فاتورة بمبلغ: ${"%.2f".format(invoice.total)}\nرصيدكم الإجمالي: ${"%.2f".format(invoice.newCustomerBalance)}\nرقم الفاتورة: ${invoice.invoiceNumber.ifEmpty { invoice.id }}"
+        shareText(context, phone, text)
     }
 
-    fun whatsappBond(context: Context, customer: CustomerEntity, bond: FinancialBondEntity) {
-        val text = "عميلنا العزيز ${customer.name}\nتم تسديد/تسجيل سند ${bond.type} بمبلغ: ${"%.2f".format(bond.amount)}\nبرقم السند: ${bond.id}\nالرصيد الحالي: ${"%.2f".format(customer.balance)}"
-        shareText(context, customer.mobile, text)
+    fun whatsappBond(context: Context, customer: CustomerEntity, bond: BondEntity) {
+        val phone = customer.phone.ifEmpty { customer.mobile }
+        val typeLabel = if (bond.type == "RECEIPT" || bond.bondType == "RECEIPT") "قبض" else "صرف"
+        val text = "عميلنا العزيز ${customer.name}\nتم تسديد/تسجيل سند $typeLabel بمبلغ: ${"%.2f".format(bond.amount)}\nبرقم السند: ${bond.bondNumber.ifEmpty { bond.id }}\nالرصيد الحالي: ${"%.2f".format(customer.currentBalance)}"
+        shareText(context, phone, text)
     }
 
     fun shareStatement(context: Context, customer: CustomerEntity, rows: List<CustomerStatementRow>) {
         val sb = StringBuilder()
         sb.append("كشف حساب العميل: ${customer.name}\n")
-        sb.append("الرصيد الحالي: ${customer.balance}\n\n")
+        sb.append("الرصيد الحالي: ${customer.currentBalance}\n\n")
         rows.forEach { row ->
             sb.append("${row.type} | مبلغ: ${row.amount} | رصيد: ${row.balanceAfter}\n")
         }
@@ -72,7 +72,7 @@ object PrintAndShare {
             val socket = device.createRfcommSocketToServiceRecord(uuid)
             socket.connect()
             val out = socket.outputStream
-            val text = "خمر نت - فاتورة مبيعات\nرقم: ${invoice.id}\nالعميل: $customerName\nالمبلغ: ${invoice.total}\nالرصيد: ${invoice.newBalance}\n\n\n"
+            val text = "خمر نت - فاتورة مبيعات\nرقم: ${invoice.invoiceNumber.ifEmpty { invoice.id }}\nالعميل: $customerName\nالمبلغ: ${invoice.total}\nالرصيد: ${invoice.newCustomerBalance}\n\n\n"
             out.write(text.toByteArray(charset("ISO-8859-1")))
             out.flush()
             socket.close()

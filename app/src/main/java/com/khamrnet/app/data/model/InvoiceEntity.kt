@@ -40,6 +40,7 @@ data class InvoiceEntity(
     val remainingAmount: Double = 0.0,
     val previousCustomerBalance: Double = 0.0,
     val newCustomerBalance: Double = 0.0,
+    val newBalance: Double = 0.0,
     val itemsJson: String = "[]", // Serialized List<InvoiceItem>
     val notes: String = "",
     val createdBy: String = "المدير",
