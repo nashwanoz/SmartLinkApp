@@ -421,7 +421,7 @@ fun ProductsScreen(
 }
 
 // -------------------------------------------------------------
-// Component: Product Grid Card
+// Component: Product Grid Card (مربع صغير يعرض اسم الصنف فقط مع زر التعديل)
 // -------------------------------------------------------------
 @Composable
 fun ProductGridCard(
@@ -433,96 +433,48 @@ fun ProductGridCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .height(90.dp)
             .clickable { onEdit() },
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFFE2E8F0)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .fillMaxSize()
+                .padding(8.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Text(
-                    text = product.name,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color(0xFF0F172A),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-
-                IconButton(
-                    onClick = onEdit,
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFFF1F5F9))
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "تعديل",
-                        tint = Color(0xFF0F766E),
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
-            }
-
-            // Price Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "سعر البيع:",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF64748B)
-                )
-                Text(
-                    text = "${product.salePrice.toInt()} $currency",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color(0xFF0F766E)
-                )
-            }
-
-            // Stock Badge
-            Box(
+            // Edit Button at top corner
+            IconButton(
+                onClick = onEdit,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFFECFDF5))
-                    .border(1.dp, Color(0xFFA7F3D0), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                    .size(24.dp)
+                    .align(Alignment.TopStart)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xFFF0FDFA))
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "المتوفر:",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF047857)
-                    )
-                    Text(
-                        text = "${product.stockQuantity.toInt()} ${product.baseUnitName}",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color(0xFF065F46)
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = "تعديل",
+                    tint = Color(0xFF0F766E),
+                    modifier = Modifier.size(13.dp)
+                )
             }
+
+            // Product Name centered in the square
+            Text(
+                text = product.name,
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.Black,
+                color = Color(0xFF0F172A),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
+            )
         }
     }
 }
