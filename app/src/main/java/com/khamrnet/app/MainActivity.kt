@@ -50,12 +50,12 @@ class MainActivity : ComponentActivity() {
                         val allInvoices by repository.allInvoices.collectAsState(initial = emptyList())
                         val allBonds by repository.allBonds.collectAsState(initial = emptyList())
 
-                        // Auto sync on start or resume if internet is available
+                        // Auto sync on start or resume safely
                         LaunchedEffect(isLoggedIn) {
                             if (isLoggedIn) {
-                                coroutineScope.launch {
+                                try {
                                     syncManager.performSync(settings.storeCode)
-                                }
+                                } catch (_: Exception) {}
                             }
                         }
 
@@ -103,7 +103,6 @@ class MainActivity : ComponentActivity() {
                                             onSaveInvoice = { invoice, items ->
                                                 coroutineScope.launch(Dispatchers.IO) {
                                                     repository.insertInvoice(invoice, items)
-                                                    // Trigger background sync
                                                     syncManager.performSync(settings.storeCode)
                                                 }
                                             },
