@@ -43,6 +43,7 @@ import com.google.gson.reflect.TypeToken
 import com.khamrnet.app.data.model.*
 import com.khamrnet.app.printer.BluetoothPrinterManager
 import com.khamrnet.app.util.ArabicNumberConverter
+import com.khamrnet.app.util.OperationNumberGenerator
 import com.khamrnet.app.util.PdfThermalGenerator
 import kotlinx.coroutines.launch
 import java.text.DecimalFormat
@@ -58,6 +59,7 @@ fun PosScreen(
     invoices: List<InvoiceEntity> = emptyList(),
     bonds: List<BondEntity> = emptyList(),
     currentUserName: String,
+    currentUserCode: String = "101",
     onSaveInvoice: (InvoiceEntity, List<InvoiceItem>) -> Unit,
     onNavigateBack: () -> Unit
 ) {
@@ -79,14 +81,17 @@ fun PosScreen(
     }
     val displayBoxBalance = (totalCashSales + totalReceiptBonds - totalPaymentBonds)
 
-    // Current date and invoice number
+    // Current date and invoice number (Using exact Web ERP Operation Numbering: UserCode + "4" + Sequence)
     val currentDateFormatted = remember {
         val sdf = SimpleDateFormat("yyyy/MM/dd", Locale("ar"))
         sdf.format(Date())
     }
-    val currentInvoiceNumber = remember(invoices) {
-        val nextSeq = invoices.size + 1
-        "INV-${String.format(Locale.US, "%04d", nextSeq)}"
+    val currentInvoiceNumber = remember(invoices, currentUserCode) {
+        OperationNumberGenerator.generateOperationNumber(
+            userCode = currentUserCode,
+            opTypeCode = "4",
+            existingNumbers = invoices.map { it.invoiceNumber }
+        )
     }
 
     // Invoice items state (Directly displayed on the same screen)
@@ -275,7 +280,7 @@ fun PosScreen(
         val newInvoice = InvoiceEntity(
             id = UUID.randomUUID().toString(),
             invoiceNumber = invoiceNo,
-            billNo = (System.currentTimeMillis() % 100000).toString(),
+            billNo = invoiceNo,
             billType = billTypeCode,
             paymentMethod = paymentMethod,
             customerId = customerId,
