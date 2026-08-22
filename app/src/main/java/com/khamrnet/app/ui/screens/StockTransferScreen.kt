@@ -81,39 +81,18 @@ fun StockTransferScreen(
     var selectedCashier by remember { mutableStateOf(cashiers.first()) }
     var isCashierMenuExpanded by remember { mutableStateOf(false) }
 
-    // View mode: "grid", "ribbon", "list"
-    var productViewMode by remember { mutableStateOf("grid") }
+    // View mode: default to "ribbon" (شريط قابل للسحب يمين أو يسار)
+    var productViewMode by remember { mutableStateOf("ribbon") }
     var searchQuery by remember { mutableStateOf("") }
+
+    // Dialog state for selecting unit & quantity before adding to cart
+    var productForDialog by remember { mutableStateOf<ProductEntity?>(null) }
+    var dialogQuantity by remember { mutableStateOf("1") }
+    var dialogIsMajorUnit by remember { mutableStateOf(false) }
 
     // Transfer cart items
     val transferItems = remember { mutableStateListOf<TransferItem>() }
     var transferNote by remember { mutableStateOf("") }
-
-    // Transfer history (local state for immediate UI feedback)
-    val transferHistory = remember {
-        mutableStateListOf(
-            TransferHistoryItem(
-                id = "tr_1",
-                transferNumber = "#TR-1082",
-                productName = "كروت ابو 100",
-                quantity = 50.0,
-                unitName = "كرت",
-                toCashierName = "كاشير 1 - نقطة السوق (102)",
-                timestamp = System.currentTimeMillis() - 1000 * 60 * 45,
-                note = "تغذية بداية الوردية"
-            ),
-            TransferHistoryItem(
-                id = "tr_2",
-                transferNumber = "#TR-1081",
-                productName = "كروت ابو 200",
-                quantity = 2.0,
-                unitName = "صفحة",
-                toCashierName = "كاشير 1 - نقطة السوق (102)",
-                timestamp = System.currentTimeMillis() - 1000 * 60 * 180,
-                note = "دفعة إضافية"
-            )
-        )
-    }
 
     // Filter products
     val displayedProducts = remember(products, searchQuery) {
@@ -126,16 +105,29 @@ fun StockTransferScreen(
         }
     }
 
-    // Helper to add or increment item in transfer cart
-    fun addItem(product: ProductEntity, isMajor: Boolean) {
-        val existingIndex = transferItems.indexOfFirst { it.product.id == product.id && it.isMajorUnit == isMajor }
+    // Helper to open dialog
+    fun openItemDialog(product: ProductEntity, isMajor: Boolean = false) {
+        productForDialog = product
+        dialogIsMajorUnit = isMajor
+        dialogQuantity = "1"
+    }
+
+    // Helper to confirm addition from dialog
+    fun confirmAddFromDialog() {
+        val product = productForDialog ?: return
+        val qty = dialogQuantity.toDoubleOrNull() ?: 1.0
+        if (qty <= 0) return
+
+        val existingIndex = transferItems.indexOfFirst { it.product.id == product.id && it.isMajorUnit == dialogIsMajorUnit }
         if (existingIndex >= 0) {
             val item = transferItems[existingIndex]
-            transferItems[existingIndex] = item.copy(quantity = item.quantity + 1)
+            transferItems[existingIndex] = item.copy(quantity = item.quantity + qty)
         } else {
-            transferItems.add(TransferItem(product = product, quantity = 1.0, isMajorUnit = isMajor))
+            transferItems.add(TransferItem(product = product, quantity = qty, isMajorUnit = dialogIsMajorUnit))
         }
-        Toast.makeText(context, "+1 ${if (isMajor) "صفحه" else (product.baseUnitName.ifEmpty { "كرت" })}: ${product.name}", Toast.LENGTH_SHORT).show()
+        val unitName = if (dialogIsMajorUnit) "صفحة" else (product.baseUnitName.ifEmpty { "كرت" })
+        Toast.makeText(context, "✅ تمت إضافة ${df.format(qty)} $unitName من ${product.name} للجدول", Toast.LENGTH_SHORT).show()
+        productForDialog = null
     }
 
     Scaffold(
@@ -477,8 +469,26 @@ fun StockTransferScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    // Product Cards Layout (Grid - 2 Columns)
-                    if (productViewMode == "grid") {
+                    // Product Cards Layout
+                    if (productViewMode == "ribbon") {
+                        // Ribbon / Carousel Horizontal Scroll (شريط قابل للسحب يمين أو يسار)
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp)
+                        ) {
+                            items(displayedProducts) { product ->
+                                Box(modifier = Modifier.width(170.dp)) {
+                                    ProductTransferCard(
+                                        product = product,
+                                        onClick = { openItemDialog(product, false) },
+                                        onAddMinor = { openItemDialog(product, false) },
+                                        onAddMajor = { openItemDialog(product, true) }
+                                    )
+                                }
+                            }
+                        }
+                    } else if (productViewMode == "grid") {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             displayedProducts.chunked(2).forEach { rowProducts ->
                                 Row(
@@ -489,30 +499,15 @@ fun StockTransferScreen(
                                         Box(modifier = Modifier.weight(1f)) {
                                             ProductTransferCard(
                                                 product = product,
-                                                onAddMinor = { addItem(product, false) },
-                                                onAddMajor = { addItem(product, true) }
+                                                onClick = { openItemDialog(product, false) },
+                                                onAddMinor = { openItemDialog(product, false) },
+                                                onAddMajor = { openItemDialog(product, true) }
                                             )
                                         }
                                     }
                                     if (rowProducts.size == 1) {
                                         Spacer(modifier = Modifier.weight(1f))
                                     }
-                                }
-                            }
-                        }
-                    } else if (productViewMode == "ribbon") {
-                        // Ribbon / Carousel Horizontal Scroll
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            items(displayedProducts) { product ->
-                                Box(modifier = Modifier.width(160.dp)) {
-                                    ProductTransferCard(
-                                        product = product,
-                                        onAddMinor = { addItem(product, false) },
-                                        onAddMajor = { addItem(product, true) }
-                                    )
                                 }
                             }
                         }
@@ -526,6 +521,7 @@ fun StockTransferScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                                        .clickable { openItemDialog(product, false) }
                                 ) {
                                     Row(
                                         modifier = Modifier
@@ -537,20 +533,20 @@ fun StockTransferScreen(
                                         // Left: Action buttons
                                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                             Button(
-                                                onClick = { addItem(product, false) },
+                                                onClick = { openItemDialog(product, false) },
                                                 shape = RoundedCornerShape(8.dp),
                                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
                                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                                             ) {
-                                                Text("+1 ${product.baseUnitName.ifEmpty { "كرت" }}", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                Text("+ ${product.baseUnitName.ifEmpty { "كرت" }}", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                             }
                                             Button(
-                                                onClick = { addItem(product, true) },
+                                                onClick = { openItemDialog(product, true) },
                                                 shape = RoundedCornerShape(8.dp),
                                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
                                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                                             ) {
-                                                Text("+1 صفحه", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                Text("+ صفحه", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                             }
                                         }
 
@@ -768,7 +764,6 @@ fun StockTransferScreen(
                                             note = transferNote.ifEmpty { "تغذية عهدة كاشير" }
                                         )
                                     }
-                                    transferHistory.addAll(0, newTransfers)
                                     onSaveTransfer(newTransfers)
                                     transferItems.clear()
                                     transferNote = ""
@@ -797,129 +792,260 @@ fun StockTransferScreen(
                     }
                 }
             }
+        }
 
-            // ================= 4. TRANSFER HISTORY LOG =================
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(16.dp))
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(
+        // ================= UNIT & QUANTITY SELECTION DIALOG =================
+        if (productForDialog != null) {
+            val product = productForDialog!!
+            val minorUnit = product.baseUnitName.ifEmpty { "كرت" }
+            val majorUnit = "صفحة"
+
+            AlertDialog(
+                onDismissRequest = { productForDialog = null },
+                title = {
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalAlignment = Alignment.End
                     ) {
-                        Text("عرض الحركات المسجلة", fontSize = 10.5.sp, color = Color(0xFF94A3B8))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                "سجل عمليات التحويل المخزني",
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Color(0xFF0F172A)
-                            )
-                            Icon(Icons.Default.History, contentDescription = null, tint = Color(0xFF64748B), modifier = Modifier.size(18.dp))
-                        }
-                    }
-
-                    if (transferHistory.isEmpty()) {
                         Text(
-                            "لا توجد حركات تحويل مسجلة بعد",
-                            fontSize = 11.sp,
-                            color = Color(0xFF94A3B8),
-                            textAlign = TextAlign.Center,
+                            product.name,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFF0F172A),
+                            textAlign = TextAlign.Start,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text(
+                            "تحديد الكمية والوحدة لسند التحويل",
+                            fontSize = 10.5.sp,
+                            color = Color(0xFF64748B)
+                        )
+                    }
+                },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Available Stock Badge
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 12.dp)
-                        )
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            transferHistory.forEach { history ->
-                                Card(
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFFF0FDF4))
+                                .border(1.dp, Color(0xFFA7F3D0), RoundedCornerShape(10.dp))
+                                .padding(horizontal = 10.dp, vertical = 8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color.White)
+                                        .border(1.dp, Color(0xFFA7F3D0), RoundedCornerShape(6.dp))
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
                                 ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(10.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        if (history.note.isNotEmpty()) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(6.dp))
-                                                    .background(Color.White)
-                                                    .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(6.dp))
-                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                                            ) {
-                                                Text(history.note, fontSize = 10.sp, color = Color(0xFF475569), fontWeight = FontWeight.Bold)
-                                            }
-                                        } else {
-                                            Spacer(modifier = Modifier.width(1.dp))
-                                        }
+                                    Text(
+                                        "${df.format(product.stockQuantity)} $minorUnit",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color(0xFF065F46)
+                                    )
+                                }
+                                Text(
+                                    "المتوفر بالمخزن الرئيسي:",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF065F46)
+                                )
+                            }
+                        }
 
-                                        Column(horizontalAlignment = Alignment.End) {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                            ) {
-                                                Text(
-                                                    "(${df.format(history.quantity)} ${history.unitName})",
-                                                    fontSize = 11.5.sp,
-                                                    fontWeight = FontWeight.Black,
-                                                    color = Color(0xFF059669)
-                                                )
-                                                Text(history.productName, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
-                                                Box(
-                                                    modifier = Modifier
-                                                        .clip(RoundedCornerShape(4.dp))
-                                                        .background(Color(0xFFDCFCE7))
-                                                        .padding(horizontal = 4.dp, vertical = 2.dp)
-                                                ) {
-                                                    Text(history.transferNumber, fontSize = 9.5.sp, fontWeight = FontWeight.Black, color = Color(0xFF065F46))
-                                                }
-                                            }
-                                            Text(
-                                                "إلى: ${history.toCashierName} • ${dateFormat.format(Date(history.timestamp))}",
-                                                fontSize = 10.sp,
-                                                color = Color(0xFF94A3B8)
+                        // Unit Selection Toggle
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                "نوع الوحدة المحولة:",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF334155),
+                                textAlign = TextAlign.Start,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0xFFF1F5F9))
+                                    .padding(4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                // Minor Unit Button
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (!dialogIsMajorUnit) Color(0xFF059669) else Color.Transparent)
+                                        .clickable { dialogIsMajorUnit = false }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "$minorUnit (صغرى)",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (!dialogIsMajorUnit) Color.White else Color(0xFF475569)
+                                    )
+                                }
+
+                                // Major Unit Button
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (dialogIsMajorUnit) Color(0xFF0F766E) else Color.Transparent)
+                                        .clickable { dialogIsMajorUnit = true }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "$majorUnit (كبرى)",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (dialogIsMajorUnit) Color.White else Color(0xFF475569)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Quantity Controls
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                "الكمية المراد تحويلها:",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF334155),
+                                textAlign = TextAlign.Start,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xFFE2E8F0))
+                                        .clickable {
+                                            val cur = dialogQuantity.toDoubleOrNull() ?: 1.0
+                                            dialogQuantity = (if (cur > 1) cur - 1 else 1.0).toInt().toString()
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("-", fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color(0xFF1E293B))
+                                }
+
+                                Spacer(modifier = Modifier.width(10.dp))
+
+                                OutlinedTextField(
+                                    value = dialogQuantity,
+                                    onValueChange = { dialogQuantity = it },
+                                    singleLine = true,
+                                    textStyle = LocalTextStyle.current.copy(
+                                        textAlign = TextAlign.Center,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Black
+                                    ),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = Color(0xFF0F766E),
+                                        unfocusedBorderColor = Color(0xFFCBD5E1)
+                                    ),
+                                    modifier = Modifier.width(110.dp)
+                                )
+
+                                Spacer(modifier = Modifier.width(10.dp))
+
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xFF0F766E))
+                                        .clickable {
+                                            val cur = dialogQuantity.toDoubleOrNull() ?: 1.0
+                                            dialogQuantity = (cur + 1).toInt().toString()
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("+", fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.White)
+                                }
+                            }
+
+                            // Quick Preset Buttons
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                listOf(1, 2, 5, 10, 50).forEach { preset ->
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(
+                                                if (dialogQuantity == preset.toString()) Color(0xFF0F766E)
+                                                else Color(0xFFF1F5F9)
                                             )
-                                        }
+                                            .clickable { dialogQuantity = preset.toString() }
+                                            .padding(vertical = 4.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            "+$preset",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (dialogQuantity == preset.toString()) Color.White else Color(0xFF475569)
+                                        )
                                     }
                                 }
                             }
                         }
                     }
-                }
-            }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = { confirmAddFromDialog() },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("إضافة لسند التحويل ➕", fontSize = 12.sp, fontWeight = FontWeight.Black)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { productForDialog = null }) {
+                        Text("إلغاء", fontSize = 12.sp, color = Color(0xFF64748B))
+                    }
+                },
+                shape = RoundedCornerShape(16.dp),
+                containerColor = Color.White
+            )
         }
     }
 }
 
 /**
- * Single Product Card Component (Matching exact visual in screenshot)
+ * Single Product Card Component (Matching exact visual in screenshot & clickable)
  */
 @Composable
 fun ProductTransferCard(
     product: ProductEntity,
-    onAddMinor: () -> Unit,
-    onAddMajor: () -> Unit
+    onClick: () -> Unit = {},
+    onAddMinor: () -> Unit = {},
+    onAddMajor: () -> Unit = {}
 ) {
     val df = remember { DecimalFormat("#,##0") }
     val minorUnit = product.baseUnitName.ifEmpty { "كرت" }
@@ -932,6 +1058,7 @@ fun ProductTransferCard(
         modifier = Modifier
             .fillMaxWidth()
             .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(16.dp))
+            .clickable { onClick() }
     ) {
         Column(
             modifier = Modifier
@@ -997,7 +1124,7 @@ fun ProductTransferCard(
                         .height(34.dp)
                 ) {
                     Text(
-                        "+ 1 $majorUnit",
+                        "+ $majorUnit",
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Black,
                         color = Color.White
@@ -1015,7 +1142,7 @@ fun ProductTransferCard(
                         .height(34.dp)
                 ) {
                     Text(
-                        "+ 1 $minorUnit",
+                        "+ $minorUnit",
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Black,
                         color = Color.White
