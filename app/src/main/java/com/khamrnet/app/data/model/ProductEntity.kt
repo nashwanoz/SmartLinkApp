@@ -7,11 +7,11 @@ import androidx.room.PrimaryKey
  * Product Unit (e.g., Piece, Box, Carton) with its conversion factor and custom prices
  */
 data class ProductUnit(
-    val id: String,
-    val name: String,
-    val factor: Double, // Conversion to base unit (Base unit factor = 1.0)
-    val purchasePrice: Double,
-    val salePrice: Double,
+    val id: String = "",
+    val name: String = "حبة",
+    val factor: Double = 1.0, // Conversion to base unit (Base unit factor = 1.0)
+    val purchasePrice: Double = 0.0,
+    val salePrice: Double = 0.0,
     val barcode: String = "",
     val isDefault: Boolean = false
 )
@@ -34,4 +34,8 @@ data class ProductEntity(
     val isActive: Boolean = true,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
-)
+) {
+    val price: Double get() = salePrice
+    val costPrice: Double get() = purchasePrice
+    val subUnitsJson: String get() = unitsJson
+}
