@@ -44,32 +44,38 @@ class CloudSyncManager(
     private val firestoreBaseUrl = "https://firestore.googleapis.com/v1/projects/$firebaseProjectId/databases/(default)/documents"
 
     fun isNetworkAvailable(): Boolean {
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val network = connectivityManager.activeNetwork ?: return false
-        val actNw = connectivityManager.getNetworkCapabilities(network) ?: return false
-        return actNw.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        return try {
+            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                ?: return false
+            val network = connectivityManager.activeNetwork ?: return false
+            val actNw = connectivityManager.getNetworkCapabilities(network) ?: return false
+            actNw.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        } catch (e: Exception) {
+            Log.w("CloudSyncManager", "Network check exception: ${e.message}")
+            false
+        }
     }
 
     suspend fun performSync(storeCode: String): Result<String> = withContext(Dispatchers.IO) {
         val cleanStoreCode = storeCode.trim().uppercase().ifEmpty { "KHAMR01" }
 
-        if (!isNetworkAvailable()) {
-            _syncStatus.value = SyncStatus(
-                state = SyncState.OFFLINE,
-                isOnline = false,
-                lastSyncTime = _syncStatus.value.lastSyncTime,
-                message = "لا يوجد اتصال بالإنترنت (يعمل أوفلاين محلياً)"
-            )
-            return@withContext Result.failure(Exception("أنت الآن أوفلاين. تم حفظ البيانات محلياً وستتم المزامنة تلقائياً عند توفر الإنترنت."))
-        }
-
-        _syncStatus.value = _syncStatus.value.copy(
-            state = SyncState.SYNCING,
-            isOnline = true,
-            message = "جاري المزامنة مع السحابة لكود المحل $cleanStoreCode..."
-        )
-
         try {
+            if (!isNetworkAvailable()) {
+                _syncStatus.value = SyncStatus(
+                    state = SyncState.OFFLINE,
+                    isOnline = false,
+                    lastSyncTime = _syncStatus.value.lastSyncTime,
+                    message = "لا يوجد اتصال بالإنترنت (يعمل أوفلاين محلياً)"
+                )
+                return@withContext Result.failure(Exception("أنت الآن أوفلاين. تم حفظ البيانات محلياً وستتم المزامنة تلقائياً عند توفر الإنترنت."))
+            }
+
+            _syncStatus.value = _syncStatus.value.copy(
+                state = SyncState.SYNCING,
+                isOnline = true,
+                message = "جاري المزامنة مع السحابة لكود المحل $cleanStoreCode..."
+            )
+
             val productDao = database.productDao()
             val customerDao = database.customerDao()
             val invoiceDao = database.invoiceDao()
