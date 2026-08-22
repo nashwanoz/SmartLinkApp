@@ -385,6 +385,59 @@ class MainActivity : ComponentActivity() {
                                             }
                                         )
                                     }
+                                    "backup" -> {
+                                        BackupScreen(
+                                            settings = settings,
+                                            products = allProducts,
+                                            customers = allCustomers,
+                                            invoices = allInvoices,
+                                            bonds = allBonds,
+                                            onRestoreData = { prods, custs, invs, bnds, sttngs ->
+                                                coroutineScope.launch(Dispatchers.IO) {
+                                                    repository.restoreAllData(prods, custs, invs, bnds, sttngs)
+                                                    syncManager.performSync(sttngs?.storeCode ?: settings.storeCode)
+                                                }
+                                            },
+                                            onNavigateBack = {
+                                                currentScreen = "home"
+                                            }
+                                        )
+                                    }
+                                    "statements" -> {
+                                        StatementsScreen(
+                                            settings = settings,
+                                            customers = allCustomers,
+                                            invoices = allInvoices,
+                                            bonds = allBonds,
+                                            products = allProducts,
+                                            currentUserName = currentUserName,
+                                            currentUserRole = "ADMIN",
+                                            onNavigateBack = {
+                                                currentScreen = "home"
+                                            }
+                                        )
+                                    }
+                                    "cashier-reports" -> {
+                                        CashierReportsScreen(
+                                            settings = settings,
+                                            invoices = allInvoices,
+                                            bonds = allBonds,
+                                            products = allProducts,
+                                            currentUserName = currentUserName,
+                                            currentUserRole = "ADMIN",
+                                            onNavigateBack = {
+                                                currentScreen = "home"
+                                            }
+                                        )
+                                    }
+                                    "permissions" -> {
+                                        PermissionsScreen(
+                                            currentUserName = currentUserName,
+                                            onNavigateBack = {
+                                                currentScreen = "home"
+                                            }
+                                        )
+                                    }
                                     "about" -> {
                                         AboutScreen(
                                             settings = settings,
@@ -445,6 +498,16 @@ class MainActivity : ComponentActivity() {
                                             onClearAllData = {
                                                 coroutineScope.launch(Dispatchers.IO) {
                                                     repository.clearAllData()
+                                                }
+                                            },
+                                            onExecuteYearClosing = { newYear ->
+                                                coroutineScope.launch(Dispatchers.IO) {
+                                                    repository.executeFiscalYearClosing(
+                                                        currentCustomers = allCustomers,
+                                                        currentProducts = allProducts,
+                                                        targetYear = newYear
+                                                    )
+                                                    syncManager.performSync(settings.storeCode)
                                                 }
                                             },
                                             onNavigate = { route ->
