@@ -3,15 +3,18 @@ package com.khamrnet.app
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.sp
 import com.khamrnet.app.data.model.SystemSettingsEntity
 import com.khamrnet.app.sync.SyncStatus
 import com.khamrnet.app.ui.KhamrTheme
@@ -45,11 +48,69 @@ class MainActivity : ComponentActivity() {
                         var currentUserName by remember { mutableStateOf("المدير") }
                         var currentScreen by remember { mutableStateOf("home") }
 
+                        var showExitDialog by remember { mutableStateOf(false) }
+                        var lastBackPressTime by remember { mutableLongStateOf(0L) }
+
                         val coroutineScope = rememberCoroutineScope()
                         val allProducts by repository.allProducts.collectAsState(initial = emptyList())
                         val allCustomers by repository.allCustomers.collectAsState(initial = emptyList())
                         val allInvoices by repository.allInvoices.collectAsState(initial = emptyList())
                         val allBonds by repository.allBonds.collectAsState(initial = emptyList())
+
+                        // Handle Back Button with double press check and exit confirmation
+                        BackHandler(enabled = true) {
+                            if (isLoggedIn && currentScreen != "home") {
+                                currentScreen = "home"
+                            } else {
+                                val currentTime = System.currentTimeMillis()
+                                if (currentTime - lastBackPressTime < 2500L) {
+                                    showExitDialog = true
+                                } else {
+                                    lastBackPressTime = currentTime
+                                    Toast.makeText(this@MainActivity, "اضغط مرة أخرى لتأكيد الخروج من التطبيق", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+
+                        // Exit Confirmation Dialog
+                        if (showExitDialog) {
+                            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                                AlertDialog(
+                                    onDismissRequest = { showExitDialog = false },
+                                    title = {
+                                        Text(
+                                            text = "تأكيد الخروج",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 16.sp,
+                                            color = Color(0xFF0F172A)
+                                        )
+                                    },
+                                    text = {
+                                        Text(
+                                            text = "هل تريد الخروج من التطبيق وإغلاقه؟",
+                                            fontSize = 14.sp,
+                                            color = Color(0xFF334155)
+                                        )
+                                    },
+                                    confirmButton = {
+                                        Button(
+                                            onClick = {
+                                                showExitDialog = false
+                                                finish()
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+                                        ) {
+                                            Text("نعم، خروج", color = Color.White, fontWeight = FontWeight.Bold)
+                                        }
+                                    },
+                                    dismissButton = {
+                                        OutlinedButton(onClick = { showExitDialog = false }) {
+                                            Text("إلغاء", color = Color(0xFF64748B))
+                                        }
+                                    }
+                                )
+                            }
+                        }
 
                         // Auto sync on start or resume safely
                         LaunchedEffect(isLoggedIn, settings.storeCode) {
