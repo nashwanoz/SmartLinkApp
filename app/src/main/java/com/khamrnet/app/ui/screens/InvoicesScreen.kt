@@ -2,6 +2,7 @@ package com.khamrnet.app.ui.screens
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -327,7 +328,7 @@ fun InvoicesScreen(
                                                 .clip(RoundedCornerShape(10.dp))
                                                 .background(Color(0xFF059669))
                                                 .clickable {
-                                                    PdfThermalGenerator.shareInvoicePdf(context, inv, settings)
+                                                    PdfThermalGenerator.shareInvoiceToWhatsApp(context, inv, settings)
                                                 }
                                                 .padding(horizontal = 8.dp, vertical = 5.dp)
                                         ) {
